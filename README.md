@@ -1,4 +1,4 @@
-📘 INCIDENT IQ
+# 📘 INCIDENT IQ
 
 Incident IQ for cloud infra.
 
@@ -36,15 +36,15 @@ Hello, Alice!
 
 🐳 Run via Docker
 # 1. Build and start the container
-docker-compose up --build
+docker compose up --build
 
 # 2. Stop the container
-docker-compose down
+docker compose down
 
 
 To open a shell inside the container:
 
-docker-compose run incident_iq bash
+docker compose run incident_iq bash
 
 ⚙️ Environment Variables
 
@@ -59,7 +59,7 @@ incident_management/
 ├── scripts/                  # Entry point scripts
 ├── pyproject.toml            # Editable install config
 ├── Dockerfile                # Container build
-├── docker-compose.yml        # Multi-container orchestration
+├── docker compose.yml        # Multi-container orchestration
 ├── requirements.txt          # Optional pinned dependencies
 ├── .env                      # Local environment variables
 └── .gitignore
