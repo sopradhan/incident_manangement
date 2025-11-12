@@ -1,0 +1,16 @@
+[project]
+name = "incident_iq"
+version = "0.1.0"
+description = "Incident IQ"
+readme = "README.md"
+requires-python = ">=3.12"
+
+[build-system]
+requires = ["setuptools>=80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

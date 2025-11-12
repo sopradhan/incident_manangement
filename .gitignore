@@ -1,0 +1,23 @@
+# Byte-compiled / cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+.env
+*.env
+
+# Python build files
+build/
+dist/
+*.egg-info/
+
+# Docker
+*.log
+.dockerignore
+
+# IDE/editor
+.vscode/
+.idea/
+.DS_Store

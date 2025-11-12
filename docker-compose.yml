@@ -1,0 +1,7 @@
+services:
+  incident_iq:
+    build: .
+    container_name: incident_iq_app
+    volumes:
+      - .:/app
+    command: python scripts/run_test.py
