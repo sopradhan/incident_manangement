@@ -696,13 +696,13 @@ class KnowledgeBaseGenerator:
         return random.choice(list(self.services.keys()))
 
     def generate_knowledge_record(self, env):
-        severity, error = self.chooseerror(env)
-        service = self.selectservicebyerror(error)
-        template = self.remediationrcatemplates.get(error, {
+        severity, error = self.choose_error(env)
+        service = self.select_service_by_error(error)
+        template = self.remediation_rca_templates.get(error, {
             "remediation": ["Investigate logs.", "Root cause analysis needed."],
             "rca": ["Root cause unknown."],
-            "businessimpact": "Potential impact to service availability.",
-            "estimatedrecoverytime": "Varies"
+            "business_impact": "Potential impact to service availability.",
+            "estimated_recovery_time": "Varies"
         })
 
         # (the rest of your code unchanged...)
@@ -740,37 +740,26 @@ class KnowledgeBaseGenerator:
         record_id = str(uuid.uuid4())
         description = f"{service} reported a {error} classified as {severity} in {env.upper()} environment."
         impact = f"Affected service operations causing degradation or failures impacting users and business."
-        remediationsteps = ". ".join(f"{idx+1}. {step}" for idx, step in enumerate(template["remediation"]))
+        remediation_steps = ". ".join(f"{idx+1}. {step}" for idx, step in enumerate(template["remediation"]))
         rca = ". ".join(f"{idx+1}. {item}" for idx, item in enumerate(template["rca"]))
-        businessimpact = template["businessimpact"]
-        estimatedrecoverytime = template["estimatedrecoverytime"]
+        business_impact = template["business_impact"]
+        estimated_recovery_time = template["estimated_recovery_time"]
 
         return {
             "id": record_id,
             "cause": error,
             "description": description,
             "impact": impact,
-            "remediationsteps": remediationsteps,
+            "remediation_steps": remediation_steps,
             "rca": rca,
-            "businessimpact": businessimpact,
-            "estimatedrecoverytime": estimatedrecoverytime,
+            "business_impact": business_impact,
+            "estimated_recovery_time": estimated_recovery_time,
             "environment": env.upper(),
             "dollar_impact": dollar_impact,
             "resource_type": resource_type
         }
 
 
-    # def generate_bulk_records(self, total=5000):
-    #     env_distribution = {"prod": 0.5, "uat": 0.3, "dev": 0.2}
-    #     records = []
-    #     for env, ratio in env_distribution.items():
-    #         count = int(total * ratio)
-    #         for _ in range(count):
-    #             records.append(self.generate_knowledge_record(env))
-    #     return records    
-
-
-# Usage
 services = {
     "Microsoft.KeyVault": {
         "type": "vaults",
@@ -867,14 +856,6 @@ error_patterns = {
     }
 }
 
-# Instantiate generator and create records
-# generator = AzureKnowledgeBaseGenerator(services, error_patterns)
-# knowledge_base_records = generator.generate_bulk_records(total=5000)
-
-# Example: print 3 records
-# for record in knowledge_base_records[:3]:
-#     print(record)
-#     print()
 
 def run(conn):
     total_records = 2000
@@ -886,19 +867,13 @@ def run(conn):
     }
 
     generator = KnowledgeBaseGenerator(services, error_patterns)
-
-    print("Generating knowledge base data with environment distribution:")
-    for env, count in env_distribution.items():
-        print(f"{env.upper()}: {count} records")
-
-    # Clear existing data in knowledge_base table
     conn.execute("DELETE FROM knowledge_base")
 
     records_created = 0
     for env in envs:
         count = env_distribution[env]
         for _ in range(count):
-            record = generator.generateknowledgerecord(env)
+            record = generator.generate_knowledge_record(env)
 
             created_at = datetime.utcnow() - timedelta(minutes=random.randint(0, 1440))
 
@@ -911,10 +886,10 @@ def run(conn):
                 record["cause"],
                 record["description"],
                 record["impact"],
-                record["remediationsteps"],
+                record["remediation_steps"],
                 record["rca"],
-                record["businessimpact"],
-                record["estimatedrecoverytime"],
+                record["business_impact"],
+                record["estimated_recovery_time"],
                 record["dollar_impact"],
                 record["resource_type"],
                 env.upper(),
@@ -922,8 +897,7 @@ def run(conn):
             ))
 
             records_created += 1
-            if records_created % 500 == 0:
-                print(f"Inserted {records_created} records...")
+            
 
     conn.commit()
 
@@ -933,8 +907,5 @@ def run(conn):
         FROM knowledge_base
         GROUP BY environment
     """)
-    print("\nFinal Distribution:")
-    for env, count in cursor.fetchall():
-        print(f"Environment: {env}, Count: {count}")
 
     print("\nKnowledge base data generation and insertion completed!")
