@@ -2,12 +2,12 @@ import sys
 from pathlib import Path
 from importlib import import_module
 from incident_iq.database.db.connection import get_connection
-from incident_iq.database.seeders.seed_incident_log import auto_run
+from incident_iq.database.seeders.seed_incident_logs import auto_run
 import time
 
 # --- Ensure consistent project root ---
 BASE_DIR = Path(__file__).resolve().parent.parent
-DATABASE_DIR = BASE_DIR / "src" / "incident_iq" / "databse"
+DATABASE_DIR = BASE_DIR / "src" / "incident_iq" / "database"
 
 sys.path.append(str(DATABASE_DIR))
 
@@ -22,14 +22,12 @@ def run_migrations(conn):
         namespace = {'conn' :conn}
         exec(code, namespace)
 
+        print(namespace)
+
         if 'run' in namespace:
             namespace['run'](conn)
 
     print("Migration completed.\n")
-        # module_name = f"migrations.{file.stem}"
-        # module = import_module(module_name)
-        # if hasattr(module, "run"):
-        #     module.run(conn)
 
 def run_seeders(conn):
     seeders_dir = DATABASE_DIR / "seeders"
@@ -55,25 +53,6 @@ def run_seeders(conn):
             namespace['run'](conn)
     
     print("Seeders complete/.\n")
-
-        # module_name = f"seeders.{file.stem}"
-        # module = import_module(module_name)
-
-        # if hasattr(module, "run"):
-        #     if hasattr(module,"table_name"):
-        #         table_name = module.table_name
-        #         cursor =conn.cursor()
-        #         cursor.execute(f"select count(*) from {table_name}")
-        #         count = cursor.fetchone() [0]
-
-        #         if count > 0:
-        #             continue
-
-        #         else:
-        #             module.run(conn)
-
-        #     else:
-        #         module.run(conn)
 
 def run():
     conn = get_connection()
@@ -109,7 +88,7 @@ def run():
 
 if __name__ == "__main__":
     run()
-    conn = get_connection()
-    while True:
-        auto_run(conn)
-        time.sleep(10)
+    # conn = get_connection()
+    # while True:
+    #     auto_run(conn)
+    #     time.sleep(10)
