@@ -1,26 +1,32 @@
 def run(conn):
-    dept = conn.execute("SELECT id FROM departments WHERE name = ?", ('Engineering',)).fetchone()
-    user = conn.execute("SELECT id FROM users WHERE email = ?", ('svk@example.com',)).fetchone()
-    if dept and user:
-        conn.execute('INSERT OR IGNORE INTO department_users (department_id, user_id) VALUES (?, ?)', (dept['id'], user['id']))
-        conn.commit()
+    # Get department
+    dept = conn.execute(
+        "SELECT id FROM departments WHERE name = ?",
+        ('Engineering',)
+    ).fetchone()
 
-    user = conn.execute("SELECT id FROM users WHERE email = ?", ('srv@example.com',)).fetchone()
-    if dept and user:
-        conn.execute('INSERT OR IGNORE INTO department_users (department_id, user_id) VALUES (?, ?)', (dept['id'], user['id']))
-        conn.commit()
+    # if not dept:
+    #     return
 
-    user = conn.execute("SELECT id FROM users WHERE email = ?", ('prs@example.com',)).fetchone()
-    if dept and user:
-        conn.execute('INSERT OR IGNORE INTO department_users (department_id, user_id) VALUES (?, ?)', (dept['id'], user['id']))
-        conn.commit()
+    # List of user emails to assign to the department
+    emails = [
+        'svk@epoch.com',
+        'srv@epoch.com',
+        'prs@epoch.com',
+        'rpk@epoch.com',
+        'sdk@epoch.com'
+    ]
 
-    user = conn.execute("SELECT id FROM users WHERE email = ?", ('rpk@example.com',)).fetchone()
-    if dept and user:
-        conn.execute('INSERT OR IGNORE INTO department_users (department_id, user_id) VALUES (?, ?)', (dept['id'], user['id']))
-        conn.commit()
+    for email in emails:
+        user = conn.execute(
+            "SELECT id FROM users WHERE email = ?",
+            (email,)
+        ).fetchone()
 
-    user = conn.execute("SELECT id FROM users WHERE email = ?", ('sdk@example.com',)).fetchone()
-    if dept and user:
-        conn.execute('INSERT OR IGNORE INTO department_users (department_id, user_id) VALUES (?, ?)', (dept['id'], user['id']))
-        conn.commit()
+        if user:
+            conn.execute(
+                'INSERT OR IGNORE INTO department_users (department_id, user_id) VALUES (?, ?)',
+                (dept['id'], user['id'])
+            )
+
+    conn.commit()
