@@ -227,7 +227,7 @@ class IncidentLogGenerator:
 
 
 def run(conn):
-    total_records=3000
+    total_records=300
     envs = ['prod', 'uat', 'dev']
     env_distribution = {
         'prod': int(total_records * 0.5),
@@ -290,7 +290,7 @@ def run(conn):
 
 def auto_run(conn):
     total_records=50
-    envs = ['prod', 'uat', 'dev']
+    envs = ['prod', 'uat', 'dev']   
     env_distribution = {
         'prod': int(total_records * 0.5),
         'uat': int(total_records * 0.3),
