@@ -7,12 +7,14 @@ def run(conn):
 
     users = conn.execute("SELECT id, email FROM users").fetchall()
     for user in users:
-        role = 'employee' if 'sdk' in user['email'] or 'prs' in user['email'] else 'admin'
+        if 'sdk' in user['email'] or 'prs' in user['email']:
+            role = 'employee'
+        elif 'rpk' in user['email'] or 'srv' in user['email']:
+            role = 'developer'
+        elif 'svk' in user['email']:
+            role = 'manager'
+
         conn.execute('INSERT OR IGNORE INTO company_users (company_id, user_id, role) VALUES (?, ?, ?)', (cid, user['id'], role))
 
-        role = 'manager' if 'svk' in user['email'] else 'admin'
-        conn.execute('INSERT OR IGNORE INTO company_users (company_id, user_id, role) VALUES (?, ?, ?)', (cid, user['id'], role))
-
-        role = 'devloper' if 'srv' in user['email'] or 'rpk' in user['email'] else 'admin'
-        conn.execute('INSERT OR IGNORE INTO company_users (company_id, user_id, role) VALUES (?, ?, ?)', (cid, user['id'], role))
     conn.commit()
+
