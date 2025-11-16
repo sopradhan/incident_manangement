@@ -1,34 +1,29 @@
 def run(conn):
-    # Root User → Admin
-    cur_user = conn.execute("SELECT id FROM users WHERE email = ?", ('root@example.com',)).fetchone()
-    cur_role = conn.execute("SELECT id FROM roles WHERE name = ?", ('admin',)).fetchone()
-    if cur_user and cur_role:
-        conn.execute('INSERT OR IGNORE INTO user_roles (user_id, role_id, company_id) VALUES (?, ?, ?)', (cur_user['id'], cur_role['id'], 1))
+    assignments = [
+        # email,        role,       company_id
+        ('root@epoch.com', 'admin',     1),
+        ('svk@epoch.com',  'manager',   2),
+        ('srv@epoch.com',  'developer',  2),
+        ('prs@epoch.com',  'employee',  2),
+        ('rpk@epoch.com',  'developer',  2),
+        ('sdk@epoch.com',  'employee',  2),
+    ]
 
-    # Alice → Employee
-    cur_user = conn.execute("SELECT id FROM users WHERE email = ?", ('svk@example.com',)).fetchone()
-    cur_role = conn.execute("SELECT id FROM roles WHERE name = ?", ('manager',)).fetchone()
-    if cur_user and cur_role:
-        conn.execute('INSERT OR IGNORE INTO user_roles (user_id, role_id, company_id) VALUES (?, ?, ?)', (cur_user['id'], cur_role['id'],2))
-    
-    cur_user = conn.execute("SELECT id FROM users WHERE email = ?", ('srv@example.com',)).fetchone()
-    cur_role = conn.execute("SELECT id FROM roles WHERE name = ?", ('devloper',)).fetchone()
-    if cur_user and cur_role:
-        conn.execute('INSERT OR IGNORE INTO user_roles (user_id, role_id, company_id) VALUES (?, ?, ?)', (cur_user['id'], cur_role['id'],2))
+    for email, role_name, company_id in assignments:
+        user = conn.execute(
+            "SELECT id FROM users WHERE email = ?",
+            (email,)
+        ).fetchone()
 
-    cur_user = conn.execute("SELECT id FROM users WHERE email = ?", ('prs@example.com',)).fetchone()
-    cur_role = conn.execute("SELECT id FROM roles WHERE name = ?", ('employee',)).fetchone()
-    if cur_user and cur_role:
-        conn.execute('INSERT OR IGNORE INTO user_roles (user_id, role_id, company_id) VALUES (?, ?, ?)', (cur_user['id'], cur_role['id'],2))
+        role = conn.execute(
+            "SELECT id FROM roles WHERE name = ?",
+            (role_name,)
+        ).fetchone()
 
-    cur_user = conn.execute("SELECT id FROM users WHERE email = ?", ('rpk@example.com',)).fetchone()
-    cur_role = conn.execute("SELECT id FROM roles WHERE name = ?", ('devloper',)).fetchone()
-    if cur_user and cur_role:
-        conn.execute('INSERT OR IGNORE INTO user_roles (user_id, role_id, company_id) VALUES (?, ?, ?)', (cur_user['id'], cur_role['id'],2))
-
-    cur_user = conn.execute("SELECT id FROM users WHERE email = ?", ('sdk@example.com',)).fetchone()
-    cur_role = conn.execute("SELECT id FROM roles WHERE name = ?", ('employee',)).fetchone()
-    if cur_user and cur_role:
-        conn.execute('INSERT OR IGNORE INTO user_roles (user_id, role_id, company_id) VALUES (?, ?, ?)', (cur_user['id'], cur_role['id'],2))
+        if user and role:
+            conn.execute(
+                "INSERT OR IGNORE INTO user_roles (user_id, role_id, company_id) VALUES (?, ?, ?)",
+                (user['id'], role['id'], company_id)
+            )
 
     conn.commit()
