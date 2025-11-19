@@ -38,6 +38,12 @@ async def watch_queue():
 
     while True:
         message = get_pending_message()
+
+        if not message:
+            print("No pending message found.")
+            await asyncio.sleep(POLL_INTERVAL)
+            continue
+
         log = "Processing " + message['data']['task'] + " with id: " + message['id']
         print(log)
         

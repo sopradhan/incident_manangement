@@ -5,6 +5,7 @@ __pycache__/
 
 # Virtual environment
 venv/
+.venv/
 .env
 *.env
 
@@ -21,3 +22,6 @@ dist/
 .vscode/
 .idea/
 .DS_Store
+
+#Bert
+src/incident_iq/ml_model/bert
