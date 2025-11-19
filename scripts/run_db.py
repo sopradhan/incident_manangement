@@ -13,7 +13,7 @@ sys.path.append(str(DATABASE_DIR))
 
 def run_migrations(conn):
     
-    migrations_dir = DATABASE_DIR / "migrations"
+    migrations_dir = DATABASE_DIR / "migration"
 
     for file in sorted(migrations_dir.glob("*.py")):
         with open(file, 'r') as f:
