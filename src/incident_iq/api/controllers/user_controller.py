@@ -1,4 +1,4 @@
-from incident_iq.models.user import User
+from incident_iq.ml.user import User
 from incident_iq.core.logger import log
 
 def handle_user_request(username: str):
