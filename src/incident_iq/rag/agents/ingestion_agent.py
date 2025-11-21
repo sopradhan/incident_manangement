@@ -9,7 +9,7 @@ from ..tools.ingestion_tools import (
     chunk_document_tool, extract_metadata_tool, save_to_vectordb_tool,
     record_agent_operation_tool, record_agent_memory_tool
 )
-from ..core.config.loader import ConfigLoader
+from ..tools.config.loader import ConfigLoader
 from ..config.env_config import EnvConfig
 
 

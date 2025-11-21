@@ -6,7 +6,7 @@ Reduces code duplication across agents
 import json
 from typing import Dict, Any, Callable, List, Optional
 from langchain_core.tools import Tool
-from .config.loader import load_all_configs
+from ..tools.config.loader import load_all_configs
 
 
 class ToolFactory:

@@ -5,7 +5,7 @@ import time
 from deepagents import create_deep_agent
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
-from ..core.config.loader import ConfigLoader
+from ..tools.config.loader import ConfigLoader
 from ..config.env_config import EnvConfig
 from .ingestion_agent import IngestionAgent
 from .retrieval_agent import RetrievalAgent

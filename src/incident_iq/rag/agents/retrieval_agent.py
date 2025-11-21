@@ -6,7 +6,7 @@ from deepagents import create_deep_agent
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
 from ..tools.ingestion_tools import record_agent_operation_tool, record_agent_memory_tool
-from ..core.config.loader import ConfigLoader
+from ..tools.config.loader import ConfigLoader
 from ..config.env_config import EnvConfig
 from ...database.models import RBACModel, EmbeddingMetadataModel
 
