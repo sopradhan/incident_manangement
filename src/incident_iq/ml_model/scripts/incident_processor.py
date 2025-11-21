@@ -8,8 +8,21 @@ import logging
 import os
 from typing import Optional, Dict, Any
 from pathlib import Path
+import sys
 
-from incident_iq.task_queue.producer import Producer
+# Add parent directories to path for imports BEFORE any other imports
+src_dir = Path(__file__).resolve().parent.parent.parent
+if str(src_dir) not in sys.path:
+    sys.path.insert(0, str(src_dir))
+
+# Now import after path is set
+try:
+    from incident_iq.task_queue.producer import Producer
+except ImportError as e:
+    # Allow fallback for testing scenarios
+    logging.warning(f"Producer import failed: {e}")
+    Producer = None
+
 import joblib
 
 from database_operations import DatabaseOperations
@@ -194,16 +207,22 @@ class IncidentProcessor:
                 self.db_ops.update_incident_status(incident_id, 'processed')
                 
                 ### make producer call with get corrective action task
+                if Producer is not None:
+                    try:
+                        print("Started publishing data ")
+                        producer1 = Producer("llm-invoke-producer", 
+                            [{"task": "llm_invoke_action", "data": mapping_data}],
+                        )
 
-                print("Started publishing data ")
-                producer1 = Producer("llm-invoke-producer", 
-                    [{"task": "llm_invoke_action", "data": mapping_data}],
-                )
+                        producer1.start()
+                        producer1.join()
 
-                producer1.start()
-                producer1.join()
-
-                print("Finished publishing data ")
+                        print("Finished publishing data ")
+                    except Exception as e:
+                        logger.warning(f"Failed to publish data via Producer: {str(e)}")
+                else:
+                    logger.debug("Producer not available, skipping publish")
+                
                 # Update statistics
                 stats['processed'] += 1
                 severity_level = severity_result['severity_level']

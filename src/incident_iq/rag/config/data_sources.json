@@ -1,0 +1,67 @@
+{
+  "data_sources": {
+    "pdf": {
+      "enabled": false,
+      "supported_extensions": [".pdf"],
+      "chunk_size": 1000,
+      "chunk_overlap": 200,
+      "loader_type": "pypdf"
+    },
+    "excel": {
+      "enabled": false,
+      "supported_extensions": [".xlsx", ".xls", ".csv"],
+      "loader_type": "pandas"
+    },
+    "sqlite": {
+      "enabled": true,
+      "description": "Ingest data from SQLite3 databases",
+      "connection_string_env": "src/incident_iq/database/data/incident_iq.db",
+      "ingestion_modes": {
+        "table_based": {
+          "enabled": true,
+          "tables_to_ingest": [
+            {
+              "name": "knowledge_base",
+              "enabled": true,
+              "description": "Main incident knowledge base",
+              "text_columns": ["cause", "description", "impact", "remediation_steps", "rca"],
+              "metadata_columns": ["id", "resource_type", "environment", "dollar_impact"],
+              "chunk_strategy": "per_record"
+            }
+          ]
+        },
+        "query_based": {
+          "enabled": false,
+          "queries": []
+        }
+      },
+      "chunking": {
+        "enabled": true,
+        "strategy": "semantic",
+        "chunk_size": 512,
+        "overlap": 50
+      },
+      "filtering": {
+        "enabled": true,
+        "exclude_patterns": ["^temp_", "^_"],
+        "include_null_values": false,
+        "skip_empty_records": true
+      }
+    },
+    "json": {
+      "enabled": true,
+      "supported_extensions": [".json"],
+      "flatten_nested": true
+    },
+    "web": {
+      "enabled": true,
+      "user_agent": "DeepAgent-RAG/1.0",
+      "timeout": 30
+    }
+  },
+  "vector_store": {
+    "type": "chroma",
+    "persist_directory": "./data/vector_store",
+    "collection_name": "rag_documents"
+  }
+}

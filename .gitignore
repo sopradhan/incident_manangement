@@ -25,3 +25,6 @@ dist/
 
 #Bert
 src/incident_iq/ml_model/bert
+
+#chroma
+src/incident_iq/database/data/chroma_db

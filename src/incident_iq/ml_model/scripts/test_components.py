@@ -13,6 +13,16 @@ from dotenv import load_dotenv
 env_path = Path(__file__).resolve().parent.parent.parent.parent.parent / ".env"
 load_dotenv(env_path)
 
+# Add src directory to Python path so incident_iq imports work
+src_path = Path(__file__).resolve().parent.parent.parent
+if str(src_path) not in sys.path:
+    sys.path.insert(0, str(src_path))
+
+# Add scripts directory to path for local imports
+scripts_path = Path(__file__).resolve().parent
+if str(scripts_path) not in sys.path:
+    sys.path.insert(0, str(scripts_path))
+
 DB_NAME = os.getenv("DB_NAME", "incident_iq.db")
 
 DB_PATH = Path(__file__).resolve().parent.parent.parent / "database" / "data" / DB_NAME

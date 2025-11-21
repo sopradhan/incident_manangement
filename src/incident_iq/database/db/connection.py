@@ -3,11 +3,9 @@ import sqlite3
 from dotenv import load_dotenv
 from pathlib import Path
 
-# Load environment variables from .env file
-env_path = Path(__file__).resolve().parent.parent.parent.parent.parent / ".env"
-load_dotenv(env_path)
+load_dotenv()
 
-DB_NAME = os.getenv("DB_NAME", "incident_iq.db")
+DB_NAME = os.getenv("DB_NAME", "incident_iq_2.db")
 DB_PATH = Path(__file__).resolve().parent.parent / "data" / DB_NAME
 
 def get_connection():
@@ -16,3 +14,5 @@ def get_connection():
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON;")
     return conn
+
+
