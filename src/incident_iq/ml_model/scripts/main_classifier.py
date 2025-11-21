@@ -9,7 +9,13 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from incident_processor import IncidentProcessor
+# Add src directory to path for imports
+src_path = Path(__file__).resolve().parent.parent.parent.parent
+if str(src_path) not in sys.path:
+    sys.path.insert(0, str(src_path))
+
+# Now import from this directory
+from incident_iq.ml_model.scripts.incident_processor import IncidentProcessor
 
 
 def setup_logging(log_level: str = "INFO") -> None:
@@ -83,14 +89,14 @@ def validate_configuration(model_dir: str, db_path: str) -> None:
 def print_banner():
     """Print application banner."""
     banner = """
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║         Incident Severity Classification System              ║
-    ║                                                               ║
-    ║         Version: 2.0                                          ║
-    ║         Using: BERT Embeddings + ML Classification           ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
+    ================================================================
+    
+         Incident Severity Classification System              
+    
+         Version: 2.0                                          
+         Using: BERT Embeddings + ML Classification           
+    
+    ================================================================
     """
     print(banner)
 
