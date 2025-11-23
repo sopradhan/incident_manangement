@@ -1,4 +1,11 @@
 def run(conn):
+    # Skip if already synced by unified sync seeder
+    cursor = conn.execute("SELECT COUNT(*) as count FROM user_roles")
+    row = cursor.fetchone()
+    if row and row['count'] > 0:
+        print("✓ User-roles already synced. Skipping seed_user_roles.")
+        return
+    
     assignments = [
         # email,        role,       company_id
         ('root@epoch.com', 'admin',     1),

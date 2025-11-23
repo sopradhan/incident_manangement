@@ -1,6 +1,7 @@
 """IngestionAgent - Optimized document ingestion with RBAC and healing integration"""
 import json
 import time
+import sqlite3
 from pathlib import Path
 from deepagents import create_deep_agent
 from langchain_core.tools import StructuredTool
@@ -11,6 +12,7 @@ from ..tools.ingestion_tools import (
 )
 from ..tools.config.loader import ConfigLoader
 from ..config.env_config import EnvConfig
+from .synthetic_questions_generator import SyntheticQuestionsGenerator
 
 
 class IngestionAgent:
@@ -26,6 +28,13 @@ class IngestionAgent:
         self.system_prompt = ConfigLoader.get_system_prompt('ingestion_agent')
         self.chunk_size = config.get('chunk_size', 500)
         self.chunk_overlap = config.get('chunk_overlap', 50)
+        
+        # Initialize SyntheticQuestionsGenerator for internal question generation
+        try:
+            self.questions_generator = SyntheticQuestionsGenerator(services, config)
+        except Exception as e:
+            self.questions_generator = None
+            print(f"Warning: Failed to initialize SyntheticQuestionsGenerator: {e}")
         
         self.tools = self._create_tools()
         self.agent = create_deep_agent(
@@ -170,6 +179,9 @@ class IngestionAgent:
                 memory_type='context'
             )
             
+            # Step 7: Generate synthetic questions for quality validation
+            self._generate_and_store_questions(doc_id, content)
+            
             execution_ms = int((time.time() - start) * 1000)
             
             return {
@@ -286,6 +298,9 @@ class IngestionAgent:
                 memory_type='context'
             )
             
+            # Step 7: Generate synthetic questions for quality validation
+            self._generate_and_store_questions(doc_id, text)
+            
             execution_ms = int((time.time() - start) * 1000)
             
             return {
@@ -304,3 +319,56 @@ class IngestionAgent:
                 "error": str(e),
                 "execution_ms": int((time.time() - start) * 1000)
             }
+    
+    def _generate_and_store_questions(self, doc_id: str, content: str) -> None:
+        """Generate synthetic questions using agent and store in database
+        
+        This method uses the SyntheticQuestionsGenerator to create test questions
+        for RAG quality validation following meta-prompting architecture pattern.
+        Questions are generated automatically during ingestion for baseline testing.
+        
+        Args:
+            doc_id: Document identifier
+            content: Document content
+        """
+        if not self.questions_generator:
+            return
+        
+        try:
+            # Generate questions using meta-prompting
+            result = self.questions_generator.generate_questions(
+                document_content=content,
+                doc_id=doc_id,
+                num_questions=5,
+                complexity_levels=["simple", "medium", "complex"]
+            )
+            
+            if not result.get('success'):
+                print(f"Question generation failed for {doc_id}: {result.get('error', 'unknown error')}")
+                return
+            
+            questions = result.get('questions', [])
+            if not questions:
+                print(f"No questions generated for {doc_id}")
+                return
+            
+            # Store questions in database
+            conn = sqlite3.connect(self.db_path)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            
+            try:
+                for q_item in questions:
+                    cursor.execute("""
+                        INSERT INTO synthetic_queries (doc_id, question, created_at)
+                        VALUES (?, ?, datetime('now'))
+                    """, (doc_id, q_item.get('question', '')))
+                
+                conn.commit()
+                print(f"✓ Stored {len(questions)} synthetic questions for {doc_id}")
+                
+            finally:
+                conn.close()
+                
+        except Exception as e:
+            print(f"Error storing synthetic questions for {doc_id}: {e}")

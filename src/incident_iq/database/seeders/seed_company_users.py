@@ -1,4 +1,11 @@
 def run(conn):
+    # Skip if already synced by unified sync seeder
+    cursor = conn.execute("SELECT COUNT(*) as count FROM company_users")
+    row = cursor.fetchone()
+    if row and row['count'] > 0:
+        print("✓ Company-users already synced. Skipping seed_company_users.")
+        return
+    
     cur = conn.execute("SELECT id FROM companies WHERE name = ?", ('Acme Corp',))
     company = cur.fetchone()
     if not company:

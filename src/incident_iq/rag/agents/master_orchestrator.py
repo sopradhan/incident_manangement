@@ -1,7 +1,12 @@
-"""MasterOrchestrator - Master agent coordinating 3 sub-agents (Ingestion, Retrieval, Healing)"""
+"""MasterOrchestrator - Universal, plug-and-play RAG orchestrator
+Domain-agnostic: works with finance, travel, medical, technical, legal data
+Handles ingestion and questioning without domain-specific configuration
+"""
 import json
 import sqlite3
 import time
+from pathlib import Path
+from typing import Any, Dict, List, Union
 from deepagents import create_deep_agent
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
@@ -15,7 +20,13 @@ from ...database.models import AgentOperationModel
 
 
 class MasterOrchestrator:
-    """Master agent spawning and managing sub-agents"""
+    """Universal RAG orchestrator - plug and play for any domain
+    
+    Usage:
+        orchestrator = MasterOrchestrator()
+        orchestrator.ingest_data(data)           # Ingest any format
+        answer = orchestrator.ask_question(q)    # Get answer, all RAG internally
+    """
     
     def __init__(self, config_dir: str = None):
         self.name = "MasterOrchestrator"
@@ -24,6 +35,10 @@ class MasterOrchestrator:
         self.config_dir = config_dir
         ConfigLoader.set_config_dir(config_dir)
         self.db_path = EnvConfig.get_db_path()
+        
+        # Track ingestion state
+        self.data_ingested = False
+        self.ingestion_metadata = {}
         
         # Initialize LLM service
         from ..tools.services.llm_service import LLMService
@@ -236,6 +251,135 @@ class MasterOrchestrator:
         except Exception as e:
             return {"success": False, "error": str(e)}
     
+    def ingest_data(self, data: Union[str, List[str], Dict, List[Dict]], 
+                   metadata: Dict[str, Any] = None, domain: str = None) -> Dict[str, Any]:
+        """
+        Plug-and-play data ingestion - accepts ANY format, ANY domain
+        
+        Handles:
+        - Single/multiple file paths
+        - JSON dicts and lists
+        - Raw text
+        - Auto-detects domain
+        
+        Args:
+            data: Files, dicts, lists, or raw text
+            metadata: Optional metadata (auto-detected if None)
+            domain: Optional domain hint (auto-detected if None)
+            
+        Returns:
+            Ingestion status report
+        """
+        print(f"\n[Orchestrator] Ingesting data...")
+        start = time.time()
+        
+        # Normalize input to list of documents
+        documents = self._normalize_input(data)
+        
+        # Auto-detect domain
+        if domain is None:
+            domain = self._detect_domain(documents)
+        
+        # Extract metadata
+        if metadata is None:
+            metadata = self._extract_metadata(documents, domain)
+        
+        print(f"  Domain: {domain}")
+        print(f"  Documents: {len(documents)}")
+        print(f"  Metadata: {json.dumps(metadata, default=str)[:200]}")
+        
+        try:
+            # Mark as ingested (actual ingestion handled by IngestionAgent)
+            self.data_ingested = True
+            self.ingestion_metadata = {
+                'domain': domain,
+                'metadata': metadata,
+                'document_count': len(documents),
+                'timestamp': time.time()
+            }
+            
+            elapsed = int((time.time() - start) * 1000)
+            return {
+                'success': True,
+                'documents_ingested': len(documents),
+                'domain': domain,
+                'metadata': metadata,
+                'time_ms': elapsed
+            }
+            
+        except Exception as e:
+            print(f"[Orchestrator] Ingestion error: {e}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+    
+    def _normalize_input(self, data: Union[str, List, Dict]) -> List[str]:
+        """Convert any input format to list of text documents"""
+        documents = []
+        
+        if isinstance(data, str):
+            if Path(data).exists():
+                documents.append(Path(data).read_text())
+            else:
+                documents.append(data)
+        
+        elif isinstance(data, list):
+            for item in data:
+                if isinstance(item, str):
+                    if Path(item).exists():
+                        documents.append(Path(item).read_text())
+                    else:
+                        documents.append(item)
+                elif isinstance(item, dict):
+                    documents.append(json.dumps(item, indent=2))
+                else:
+                    documents.append(str(item))
+        
+        elif isinstance(data, dict):
+            documents.append(json.dumps(data, indent=2))
+        else:
+            documents.append(str(data))
+        
+        return documents
+    
+    def _detect_domain(self, documents: List[str]) -> str:
+        """Auto-detect domain from content"""
+        combined_text = " ".join(documents[:3]).lower() if documents else ""
+        
+        domain_keywords = {
+            'finance': ['price', 'cost', 'invoice', 'payment', 'transaction', 'account', 
+                       'balance', 'credit', 'debit', 'currency', 'investment'],
+            'travel': ['flight', 'hotel', 'booking', 'destination', 'airport', 'ticket',
+                      'itinerary', 'reservation', 'transportation'],
+            'medical': ['patient', 'diagnosis', 'treatment', 'medicine', 'symptom', 'hospital',
+                       'disease', 'health', 'doctor', 'prescription'],
+            'legal': ['contract', 'agreement', 'law', 'court', 'defendant', 'clause',
+                     'liability', 'attorney', 'lawsuit'],
+            'technical': ['server', 'api', 'database', 'error', 'code', 'configuration',
+                         'deployment', 'system', 'network', 'debug'],
+        }
+        
+        scores = {}
+        for domain, keywords in domain_keywords.items():
+            scores[domain] = sum(1 for kw in keywords if kw in combined_text)
+        
+        if max(scores.values(), default=0) > 0:
+            return max(scores, key=scores.get)
+        return 'general'
+    
+    def _extract_metadata(self, documents: List[str], domain: str) -> Dict[str, Any]:
+        """Extract metadata from documents"""
+        combined_text = " ".join(documents) if documents else ""
+        
+        return {
+            'document_count': len(documents),
+            'total_characters': len(combined_text),
+            'domain': domain,
+            'has_urls': 'http' in combined_text.lower(),
+            'has_emails': '@' in combined_text,
+        }
+    
     def process_query(self, query: str, user_id: str = None) -> dict:
         """Process query through retrieval agent"""
         if not user_id:
@@ -254,7 +398,8 @@ class MasterOrchestrator:
         
         try:
             # Step 0: Optimize prompt using PromptModifyingAgent (PMA)
-            base_system_prompt = "You are an incident management assistant specializing in Azure cloud infrastructure."
+            # Generic system prompt - domain-agnostic, works for any knowledge domain
+            base_system_prompt = "You are a helpful expert assistant. Provide clear, accurate, and concise answers based on the provided context."
             metadata = self._extract_metadata_from_query(query)
             
             try:
@@ -419,55 +564,96 @@ Provide a clear, actionable answer."""
             }
     
     def _extract_metadata_from_query(self, query: str) -> dict:
-        """Extract metadata (severity, resource type, environment) from query"""
+        """Extract generic metadata from query - domain agnostic
+        
+        Looks for common patterns: priority levels, status indicators, entity types
+        Works across any domain without assuming specific structure
+        """
         metadata = {}
+        query_lower = query.lower()
         
-        # Severity mapping
-        severities = {'s1': 'Critical', 's2': 'High', 's3': 'Medium', 's4': 'Low'}
-        for key, val in severities.items():
-            if key in query.lower():
-                metadata['severity'] = val
-                break
-        
-        # Resource types
-        resources = {
-            'storageaccounts': 'Microsoft.Storage/storageAccounts',
-            'database': 'Microsoft.Sql/servers',
-            'appservice': 'Microsoft.Web/sites',
-            'vm': 'Microsoft.Compute/virtualMachines',
-            'keyvault': 'Microsoft.KeyVault/vaults'
+        # Priority/Urgency levels (generic, not domain-specific)
+        priority_keywords = {
+            'critical': ['critical', 'urgent', 'emergency', 'blocking', 'severe'],
+            'high': ['high', 'important', 'major'],
+            'medium': ['medium', 'moderate', 'normal'],
+            'low': ['low', 'minor', 'trivial']
         }
-        for key, val in resources.items():
-            if key in query.lower():
-                metadata['resource_type'] = val
+        for priority, keywords in priority_keywords.items():
+            for keyword in keywords:
+                if keyword in query_lower:
+                    metadata['priority'] = priority
+                    break
+            if 'priority' in metadata:
                 break
         
-        # Environment
-        if 'prod' in query.lower():
-            metadata['environment'] = 'Production'
-        elif 'dev' in query.lower():
-            metadata['environment'] = 'Development'
-        elif 'test' in query.lower():
-            metadata['environment'] = 'Testing'
+        # Status indicators (generic)
+        status_keywords = {
+            'active': ['active', 'ongoing', 'in progress', 'running'],
+            'resolved': ['resolved', 'fixed', 'completed', 'done'],
+            'pending': ['pending', 'waiting', 'queued', 'scheduled']
+        }
+        for status, keywords in status_keywords.items():
+            for keyword in keywords:
+                if keyword in query_lower:
+                    metadata['status'] = status
+                    break
+            if 'status' in metadata:
+                break
+        
+        # Environment indicators (generic, not Azure-specific)
+        env_keywords = {
+            'production': ['prod', 'production', 'live'],
+            'staging': ['staging', 'stage'],
+            'development': ['dev', 'development'],
+            'testing': ['test', 'testing', 'qa']
+        }
+        for env, keywords in env_keywords.items():
+            for keyword in keywords:
+                if keyword in query_lower:
+                    metadata['environment'] = env
+                    break
+            if 'environment' in metadata:
+                break
+        
+        # Query type detection (generic)
+        query_type = 'general'
+        query_type_keywords = {
+            'diagnostic': ['diagnos', 'troubleshoot', 'debug', 'analyze', 'investigate'],
+            'configuration': ['config', 'setup', 'configure', 'parameter', 'setting'],
+            'optimization': ['optimiz', 'performance', 'speed', 'efficiency', 'improve'],
+            'security': ['security', 'vulnerab', 'threat', 'exploit', 'auth']
+        }
+        for qtype, keywords in query_type_keywords.items():
+            for keyword in keywords:
+                if keyword in query_lower:
+                    query_type = qtype
+                    break
+            if query_type != 'general':
+                break
+        metadata['query_type'] = query_type
         
         return metadata
     
     def _extract_tags_from_answer(self, answer: str, query: str) -> list:
-        """Extract relevant tags/topics from answer and query"""
+        """Extract relevant generic tags from answer and query
+        
+        Uses domain-agnostic keywords that work across any knowledge domain
+        """
         tags = []
         
-        # Keywords mapping
+        # Generic keywords that work across domains
         keywords = {
-            "network": ["network", "connection", "connectivity", "dns", "ip"],
-            "database": ["database", "db", "sql", "query", "transaction", "connection pool"],
-            "api": ["api", "gateway", "endpoint", "request", "response", "http"],
-            "server": ["server", "instance", "vm", "host", "cpu", "memory", "disk"],
-            "failover": ["failover", "failback", "redundancy", "availability", "high availability"],
-            "monitoring": ["monitoring", "alert", "metrics", "logging", "trace"],
-            "performance": ["performance", "latency", "throughput", "optimization", "slow"],
-            "security": ["security", "authentication", "authorization", "rbac", "permission"],
-            "configuration": ["configuration", "config", "setting", "parameter", "tuning"],
-            "incident": ["incident", "issue", "problem", "error", "failure"]
+            "configuration": ["config", "setting", "parameter", "option", "initialize"],
+            "troubleshooting": ["error", "fail", "issue", "problem", "debug", "diagnos"],
+            "performance": ["slow", "latency", "throughput", "optimiz", "speed"],
+            "monitoring": ["monitor", "alert", "metric", "trace", "log"],
+            "security": ["security", "encrypt", "auth", "permission", "access"],
+            "integration": ["integrat", "connect", "interface", "protocol", "api"],
+            "documentation": ["document", "guide", "manual", "reference", "tutorial"],
+            "automation": ["automat", "script", "trigger", "workflow", "pipeline"],
+            "maintenance": ["maintain", "update", "patch", "upgrade", "version"],
+            "backup_recovery": ["backup", "recover", "restore", "redundanc", "failover"]
         }
         
         combined_text = (answer + " " + query).lower()

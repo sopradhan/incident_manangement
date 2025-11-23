@@ -25,9 +25,9 @@
       "company_name": "Acme Corp",
       "department_id": 2,
       "department_name": "Engineering",
-      "role_id": 1,
-      "role_name": "Engineer I",
-      "access_level": 2,
+      "role_id": 3,
+      "role_name": "Engineer",
+      "access_level": 3,
       "can_access": ["public", "internal_engineering", "technical_docs", "api_docs"]
     }
   },

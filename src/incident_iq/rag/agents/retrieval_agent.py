@@ -9,10 +9,15 @@ from ..tools.ingestion_tools import record_agent_operation_tool, record_agent_me
 from ..tools.config.loader import ConfigLoader
 from ..config.env_config import EnvConfig
 from ...database.models import RBACModel, EmbeddingMetadataModel
+from .synthetic_questions_generator import SyntheticQuestionsGenerator
 
 
 class RetrievalAgent:
-    """Semantic search with token cost tracking and RBAC enforcement"""
+    """Semantic search with token cost tracking
+    
+    Domain-agnostic: Retrieves relevant documents from vector DB for any knowledge domain.
+    No hardcoded assumptions about RBAC, namespaces, or domain-specific constraints.
+    """
     
     def __init__(self, services: dict, config: dict, master_orchestrator=None):
         self.services = services
@@ -20,10 +25,17 @@ class RetrievalAgent:
         self.name = config.get('name', 'RetrievalAgent')
         self.db_path = EnvConfig.get_db_path()
         
+        # Initialize SyntheticQuestionsGenerator for retrieval quality testing
+        try:
+            self.questions_generator = SyntheticQuestionsGenerator(services, config)
+        except Exception as e:
+            self.questions_generator = None
+            print(f"Warning: Failed to initialize SyntheticQuestionsGenerator: {e}")
+        
         ConfigLoader.set_config_dir(EnvConfig.get_rag_config_path())
         self.system_prompt = ConfigLoader.get_system_prompt('retrieval_agent') or \
-            "Retrieve relevant information from knowledge base. Enforce RBAC constraints. " \
-            "Return optimized results with token cost tracking."
+            "Retrieve relevant documents from knowledge base. " \
+            "Return the most relevant results with quality scores and token tracking."
         
         self.tools = self._create_tools()
         self.agent = create_deep_agent(
@@ -33,27 +45,27 @@ class RetrievalAgent:
         )
     
     def _create_tools(self):
-        """Create retrieval tools"""
+        """Create retrieval tools (domain-agnostic)"""
         agent = self
         
         class QueryInput(BaseModel):
             query: str = Field(description="Search query")
-            namespace: str = Field(default="general", description="RBAC namespace filter")
-            top_k: int = Field(default=5, description="Number of results")
+            top_k: int = Field(default=5, description="Number of results to retrieve")
         
         class SpawnHealerInput(BaseModel):
-            doc_id: str = Field(description="Document to optimize for retrieval")
+            doc_id: str = Field(description="Document to optimize")
             strategy: str = Field(default="rerank", description="rerank|retune_threshold|rebalance_embeddings")
         
-        def search_semantic(query: str, namespace: str = "general", top_k: int = 5) -> str:
+        def search_semantic(query: str, top_k: int = 5) -> str:
+            """Semantic search - works with any domain"""
             try:
                 embedding = agent.services['llm'].generate_embedding(query)
                 collection = agent.services['vectordb'].collection
                 
+                # Search without namespace filtering - works for any domain
                 results = collection.query(
                     query_embeddings=[embedding],
-                    n_results=top_k,
-                    where={"rbac_namespace": namespace}
+                    n_results=top_k
                 )
                 
                 docs = results.get('documents', [[]])[0]
@@ -166,7 +178,7 @@ class RetrievalAgent:
         }
     
     def process_query(self, query: str, user_id: str) -> dict:
-        """Process user query with RBAC, dynamic parameters, and token tracking"""
+        """Process user query with dynamic parameters and token tracking (domain-agnostic)"""
         start = time.time()
         try:
             # Classify query and get dynamic parameters
@@ -175,17 +187,15 @@ class RetrievalAgent:
             relevance_threshold = query_params['relevance_threshold']
             llm_temp = query_params['llm_temperature']
             
-            # Check RBAC using model layer
-            conn = sqlite3.connect(self.db_path)
-            conn.row_factory = sqlite3.Row
-            
-            metadata_model = EmbeddingMetadataModel(conn)
-            # Get any available namespace from embedding metadata
-            records = metadata_model.raw_execute("SELECT DISTINCT rbac_namespace FROM embedding_metadata LIMIT 1")
-            namespace = records[0]['rbac_namespace'] if records else "general"
-            conn.close()
-            
             # Get embedding
+            embedding = self.services['llm'].generate_embedding(query)
+            
+            # Semantic search - no namespace filtering, works for any domain
+            collection = self.services['vectordb'].collection
+            results = collection.query(
+                query_embeddings=[embedding],
+                n_results=top_k
+            )
             embedding = self.services['llm'].generate_embedding(query)
             
             # Semantic search with dynamic top_k

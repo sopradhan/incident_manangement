@@ -9,6 +9,7 @@ from ..tools.ingestion_tools import record_agent_operation_tool, record_agent_me
 from ..tools.config.loader import ConfigLoader
 from ..config.env_config import EnvConfig
 from ...database.models import EmbeddingMetadataModel
+from .synthetic_questions_generator import SyntheticQuestionsGenerator
 
 
 class HealingAgent:
@@ -20,6 +21,13 @@ class HealingAgent:
         self.name = config.get('name', 'HealingAgent')
         self.db_path = EnvConfig.get_db_path()
         self.caller_agent = caller_agent  # Track which agent spawned this: 'IngestionAgent', 'RetrievalAgent', etc
+        
+        # Initialize SyntheticQuestionsGenerator for validation testing
+        try:
+            self.questions_generator = SyntheticQuestionsGenerator(services, config)
+        except Exception as e:
+            self.questions_generator = None
+            print(f"Warning: Failed to initialize SyntheticQuestionsGenerator: {e}")
         
         ConfigLoader.set_config_dir(EnvConfig.get_rag_config_path())
         
