@@ -1,15 +1,12 @@
 import asyncio
 import json
-
 from pathlib import Path
-
 import sys,os
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__),'..','src')))
 
-
-#from ai_models.llm.corrective_action_rag import handle_message
-from incident_iq.database.db.connection import get_connection  
-from incident_iq.transport.main import Transporter 
+from incident_iq.database.db.connection import get_connection
+from incident_iq.transport.main import Transporter
 from incident_iq.database.models.queue import QueueModel
 
 POLL_INTERVAL = 1  # seconds between checks
@@ -23,6 +20,7 @@ def get_model():
 def get_pending_message():
     queue_model = get_model()
     row = queue_model.get_first_pending_item()
+
     if row:
         return {"id": row['id'], "data": json.loads(row['data'])}
 
@@ -46,20 +44,20 @@ async def watch_queue():
 
         log = "Processing " + message['data']['task'] + " with id: " + message['id']
         print(log)
-        
+
         if(message['data']['task'] == 'llm_invoke'):
             transporter = Transporter()
             await transporter.process(message['data']['data'])
-        
+
         elif(message['data']['task'] == 'set_corrective_action'):
             mark_message_processed(message["id"])
-    
+
         elif(message['data']['task'] == 'sourav-producer2'):
             print("Sourav Block 2")
 
         else:
             mark_message_processed(message["id"])
-            
+
         await asyncio.sleep(POLL_INTERVAL)
 
 if __name__ == "__main__":

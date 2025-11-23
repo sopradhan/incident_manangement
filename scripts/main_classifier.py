@@ -4,10 +4,8 @@ from pathlib import Path
 
 if __name__ == "__main__":
     project_root = Path(__file__).resolve().parent.parent
+    actual_classifier_script = project_root / "src" / "incident_iq" / "ml_model" / "scripts" / "main_classifier.py"
 
-    print("=" * 80)
-    print("INCIDENT CLASSIFIER")
-    print("=" * 80)
 
     # Execute the actual classifier script
     result = subprocess.run(
