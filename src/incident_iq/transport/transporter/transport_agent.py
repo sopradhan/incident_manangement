@@ -1,21 +1,17 @@
-from dotenv import load_dotenv
-import httpx
-from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
 from datetime import datetime
-
-
+from dotenv import load_dotenv
 from incident_iq.database.db.connection import get_connection
-from incident_iq.transport.transport_models import IncidentContext
-from typing import Any
-import json
-
-from incident_iq.transport.transporter.transport_utils import build_incident_prompt_context
 from incident_iq.database.models.classifier_output import ClassifierOutputsModel
-
 from incident_iq.transport.tools import create_jira_issue, post_slack_alert
+from incident_iq.transport.transport_models import IncidentContext
+from incident_iq.transport.transporter.transport_utils import build_incident_prompt_context
+from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
+from typing import Any
+import httpx
+import json
 import json
 
-client = httpx.Client(verify=False) 
+client = httpx.Client(verify=False)
 
 load_dotenv()
 
@@ -26,14 +22,14 @@ class IntelligentTicketingAgent:
         self.llm = self.llm = ChatOllama(
             model="llama3.2",
             base_url="http://localhost:11434",
-        )    
-        
+        )
+
         # Define the tools the LLM can use
         self.tools = [
             create_jira_issue,
             post_slack_alert
         ]
-        
+
         # Bind tools to LLM
         self.llm_with_tools = self.llm.bind_tools(self.tools)
 
@@ -45,18 +41,18 @@ class IntelligentTicketingAgent:
             parts.append("PEAK TRAFFIC - Maximum user activity")
         else:
             parts.append("BUSINESS HOURS - Team available")
-        
+
         if context.weekend:
             parts.append("WEEKEND")
-        
+
         if context.customer_facing:
             parts.append("CUSTOMER-FACING")
         else:
             parts.append("NTERNAL ONLY")
-        
+
         if context.revenue_impacting:
             parts.append("REVENUE-IMPACTING")
-        
+
         return "\n".join(parts)
 
 
@@ -137,7 +133,7 @@ class IntelligentTicketingAgent:
             try:
                 # Get LLM response with tool binding
                 response = self.llm_with_tools.invoke(messages)
-               
+
 
                 # Check if LLM wants to call tools
                 if hasattr(response, "tool_calls") and response.tool_calls:
