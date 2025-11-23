@@ -31,7 +31,6 @@ class IncidentManagementSystem:
         # Step 2: LLM Decision + MCP Execution
         print("Started LLM processing ....")
         try:
-            self.tic
             await self.ticketing_agent.make_decision_and_execute(payload,context)
         except Exception as e:
             return {"status": "error", "message": str(e)}

@@ -17,9 +17,11 @@ class ClassifierOutputsModel(BaseModel):
         return [dict(row) for row in cur.fetchall()]
 
     def update_by_id(self, id: int, 
-                    corrective_action: str = None, 
+                    approved_corrective_action: str = None, 
                     approved_by: str = None, 
-                    approved_ts: datetime = None) -> None:
+                    approved_at: datetime = None,
+                    is_llm_correction_approved: int = 0
+                    ) -> None:
         """
         Update columns for a record identified by `id`.
         Only updates the fields provided (non-None).
@@ -27,12 +29,14 @@ class ClassifierOutputsModel(BaseModel):
         
         # Collect fields to update
         update_fields = {}
-        if corrective_action is not None:
-            update_fields["corrective_action"] = corrective_action
+        if approved_corrective_action is not None:
+            update_fields["approved_corrective_action"] = approved_corrective_action
         if approved_by is not None:
             update_fields["approved_by"] = approved_by
-        if approved_ts is not None:
-            update_fields["approved_ts"] = approved_ts
+        if approved_at is not None:
+            update_fields["approved_at"] = approved_at    
+        if is_llm_correction_approved is not None:
+            update_fields["is_llm_correction_approved"] = is_llm_correction_approved    
 
         if not update_fields:
             print("No fields provided to update.")
@@ -124,5 +128,18 @@ class ClassifierOutputsModel(BaseModel):
         ORDER BY 
             environment DESC, resource_type ASC, severity_id ASC, is_incident DESC
         """)
+        cur = self.conn.execute(sql)
+        return [dict(row) for row in cur.fetchall()]
+    
+    def find_unapproved_inc(self) -> List[Dict[str, Any]]:
+        """
+        Fetch all rows where is_llm_correction_approved IS NULL
+        (i.e., pending approvals).
+        """
+        sql = f"""
+            SELECT *
+            FROM {self.table}
+            WHERE approved_at IS NULL
+        """
         cur = self.conn.execute(sql)
         return [dict(row) for row in cur.fetchall()]

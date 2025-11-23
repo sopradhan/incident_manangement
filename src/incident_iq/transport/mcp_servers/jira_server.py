@@ -8,8 +8,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 if str(BASE_DIR) not in sys.path:
     sys.path.append(str(BASE_DIR))
     
-from incident_db.db.connection import get_connection
-from incident_db.models.all_incident import AllIncidentModel
+from incident_iq.database.db.connection import get_connection
+from incident_iq.database.models.all_incident import AllIncidentModel
 
 app = FastAPI(title="Jira MCP Server")
 

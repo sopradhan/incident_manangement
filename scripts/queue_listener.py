@@ -44,15 +44,15 @@ async def watch_queue():
             await asyncio.sleep(POLL_INTERVAL)
             continue
 
-        log = "Processing " + message['data']['task'] + " with id: " + message['id']
-        print(log)
-        
+        # log = "Processing " + message['data']['task'] + " with id: " + message['id']
+    
         if(message['data']['task'] == 'llm_invoke'):
             transporter = Transporter()
             await transporter.process(message['data']['data'])
         
         elif(message['data']['task'] == 'set_corrective_action'):
             mark_message_processed(message["id"])
+            pass
     
         elif(message['data']['task'] == 'sourav-producer2'):
             print("Sourav Block 2")

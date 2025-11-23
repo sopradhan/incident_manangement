@@ -1,4 +1,6 @@
+import json
 from typing import List, Dict, Any
+import json
 from .base_model import BaseModel
 
 class IncidentLogsModel(BaseModel):
@@ -24,3 +26,32 @@ class IncidentLogsModel(BaseModel):
     def find_unprocessed(self) -> List[Dict[str, Any]]:
         cur = self.conn.execute(f"SELECT * FROM {self.table} WHERE processed_at IS NULL")
         return [dict(row) for row in cur.fetchall()]
+    
+
+    def bulk_insert(self, records: List[Dict[str, Any]]) -> None:
+        """
+        Bulk insert multiple records into the incident_logs table.
+
+        Each record must be a dict containing:
+            payload_id, payload, source_type, status, created_at, processed_at
+        """
+        sql = f"""
+            INSERT INTO {self.table} 
+            (payload_id, payload, source_type, status, created_at, processed_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """
+
+        values_list = []
+
+        for rec in records:
+            values_list.append((
+                rec["payload_id"],
+                json.dumps(rec["payload"]),
+                rec["source_type"],
+                rec["status"],
+                rec["created_at"],
+                rec["processed_at"]
+            ))
+
+        self.conn.executemany(sql, values_list)
+        self.conn.commit()

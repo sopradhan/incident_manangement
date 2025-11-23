@@ -1,5 +1,6 @@
 import threading
 import time
+import uuid
 
 from incident_iq.database.db.connection import get_connection
 from incident_iq.database.models.queue import QueueModel
@@ -25,6 +26,7 @@ class Producer(threading.Thread):
 
         for item in self.items:
             payload ={
+                "id": str(uuid.uuid4()),
                 "data": json.dumps(item),
                 "status": "pending"
             }

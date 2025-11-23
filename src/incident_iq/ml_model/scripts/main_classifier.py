@@ -9,7 +9,7 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from incident_processor import IncidentProcessor
+from incident_iq.ml_model.scripts.incident_processor import IncidentProcessor
 
 
 def setup_logging(log_level: str = "INFO") -> None:

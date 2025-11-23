@@ -3,7 +3,7 @@ import httpx
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
 from datetime import datetime
 
-
+from langchain_ollama import ChatOllama
 from incident_iq.database.db.connection import get_connection
 from incident_iq.transport.transport_models import IncidentContext
 from typing import Any
@@ -131,63 +131,58 @@ class IntelligentTicketingAgent:
         ]
         tool_calls_made = []
         reasoning_text = ""
+        try:
+            # Get LLM response with tool binding
+            response = self.llm_with_tools.invoke(messages)
+            print(response) 
 
-        max_iterations = 5
-        for iteration in range(max_iterations):
-            try:
-                # Get LLM response with tool binding
-                response = self.llm_with_tools.invoke(messages)
-               
+            # Check if LLM wants to call tools
+            if hasattr(response, "tool_calls") and response.tool_calls:
+                print(f"LLM decided to call {len(response.tool_calls)} tool(s)")
 
-                # Check if LLM wants to call tools
-                if hasattr(response, "tool_calls") and response.tool_calls:
-                    print(f"LLM decided to call {len(response.tool_calls)} tool(s)")
+                messages.append(response)
 
-                    messages.append(response)
+                for tool_call in response.tool_calls:
+                    tool_name = tool_call["name"]
+                    tool_args = tool_call["args"]
+                    tool_id = tool_call.get("id", "unknown")
 
-                    for tool_call in response.tool_calls:
-                        tool_name = tool_call["name"]
-                        tool_args = tool_call["args"]
-                        tool_id = tool_call.get("id", "unknown")
+                    try:
+                        # Run the correct tool
+                        if tool_name == "create_jira_issue":
+                            result = await self.tools[0].ainvoke(tool_args)
+                        elif tool_name == "post_slack_alert":
+                            result = await self.tools[1].ainvoke(tool_args)
+                        else:
+                            result = {"status": "error", "message": f"Unknown tool: {tool_name}"}
 
-                        try:
-                            # Run the correct tool
-                            if tool_name == "create_jira_issue":
-                                result = await self.tools[0].ainvoke(tool_args)
-                            elif tool_name == "post_slack_alert":
-                                result = await self.tools[1].ainvoke(tool_args)
-                            else:
-                                result = {"status": "error", "message": f"Unknown tool: {tool_name}"}
+                        print(f"  Result: {result}")
 
-                            print(f"  Result: {result}")
+                        tool_calls_made.append({
+                            "tool": tool_name,
+                            "arguments": tool_args,
+                            "result": result
+                        })
 
-                            tool_calls_made.append({
-                                "tool": tool_name,
-                                "arguments": tool_args,
-                                "result": result
-                            })
+                        # Add response back to conversation
+                        messages.append(ToolMessage(
+                            content=json.dumps(result),
+                            tool_call_id=tool_id
+                        ))
 
-                            # Add response back to conversation
-                            messages.append(ToolMessage(
-                                content=json.dumps(result),
-                                tool_call_id=tool_id
-                            ))
+                    except Exception as e:
+                        error_result = {"status": "error", "message": str(e)}
+                        messages.append(ToolMessage(
+                            content=json.dumps(error_result),
+                            tool_call_id=tool_id
+                        ))
 
-                        except Exception as e:
-                            error_result = {"status": "error", "message": str(e)}
-                            messages.append(ToolMessage(
-                                content=json.dumps(error_result),
-                                tool_call_id=tool_id
-                            ))
-
-                else:
-                    # LLM finished decision-making
-                    if hasattr(response, "content") and response.content:
-                        reasoning_text = response.content
-                        print(f"\nReasoning: {reasoning_text[:300]}...")
-                    break
-
-            except Exception as e:
-                import traceback
-                traceback.print_exc()
-                break
+            else:
+                # LLM finished decision-making
+                if hasattr(response, "content") and response.content:
+                    reasoning_text = response.content
+                    print(f"\nReasoning: {reasoning_text[:300]}...")
+            
+        except Exception as e:
+            import traceback
+            traceback.print_exc()

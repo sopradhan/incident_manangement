@@ -1,7 +1,7 @@
 from langchain_core.tools import tool
 import requests
 
-SLACK_MCP = "http://localhost:8003/slack"  # Slack MCP server endpoint
+SLACK_MCP = "http://localhost:8002/slack"  # Slack MCP server endpoint
 
 
 @tool

@@ -12,10 +12,10 @@ from pathlib import Path
 from incident_iq.task_queue.producer import Producer
 import joblib
 
-from database_operations import DatabaseOperations
-from bert_embedder import BertEmbedder
-from severity_engine import SeverityEngine
-from resource_extractor import ResourceExtractor
+from incident_iq.ml_model.scripts.database_operations import DatabaseOperations
+from incident_iq.ml_model.scripts.bert_embedder import BertEmbedder
+from incident_iq.ml_model.scripts.severity_engine import SeverityEngine
+from incident_iq.ml_model.scripts.resource_extractor import ResourceExtractor
 
 logger = logging.getLogger(__name__)
 
@@ -197,7 +197,7 @@ class IncidentProcessor:
 
                 print("Started publishing data ")
                 producer1 = Producer("llm-invoke-producer", 
-                    [{"task": "llm_invoke_action", "data": mapping_data}],
+                    [{"task": "set_corrective_action", "data": mapping_data}],
                 )
 
                 producer1.start()
