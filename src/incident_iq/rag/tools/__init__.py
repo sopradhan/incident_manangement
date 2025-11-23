@@ -11,19 +11,19 @@ __all__ = [
     'classify_rbac_tool',
     'generate_embeddings_tool',
     'store_embeddings_tool',
-    
+
     # Retrieval tools
     'permission_check_tool',
     'vector_search_tool',
     'rerank_results_tool',
     'synthesize_answer_tool',
-    
+
     # Healing tools
     'analyze_heatmap_tool',
     'detect_low_quality_tool',
     'generate_synthetic_questions_tool',
     'reindex_documents_tool',
-    
+
     # Common tools
     'get_system_status_tool',
     'query_database_tool'

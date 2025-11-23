@@ -18,11 +18,11 @@ from ...database.models.rbac_model import RBACModel
 def get_system_status_tool(db_service, vectordb_service) -> str:
     """
     Get comprehensive system status using model-based access.
-    
+
     Args:
         db_service: Database service instance
         vectordb_service: Vector DB service instance
-        
+
     Returns:
         JSON string with system status
     """
@@ -30,7 +30,7 @@ def get_system_status_tool(db_service, vectordb_service) -> str:
         # Get connection from db_service
         conn = sqlite3.connect(db_service.db_path)
         conn.row_factory = sqlite3.Row
-        
+
         # Initialize models
         doc_model = DocumentModel(conn)
         emb_model = EmbeddingMetadataModel(conn)
@@ -39,30 +39,30 @@ def get_system_status_tool(db_service, vectordb_service) -> str:
         rbac_model = RBACModel(conn)
         healing_model = HealingOperationModel(conn)
         heatmap_model = QueryHeatmapModel(conn)
-        
+
         # Document counts
         total_docs = doc_model.count()
         total_chunks = emb_model.count()
         vector_count = vectordb_service.count()
-        
+
         # Operation stats
         total_ops = ops_model.count()
         recent_ops = ops_model.get_recent_operations_count(24)
-        
+
         # Token usage
         tokens = token_model.get_total_tokens_used()
-        
+
         # Query heatmap stats
         heatmap_stats = heatmap_model.get_stats()
-        
+
         # RBAC stats
         total_users = rbac_model.get_total_users_count()
-        
+
         # Healing stats
         total_healing = healing_model.count()
-        
+
         conn.close()
-        
+
         return json.dumps({
             "success": True,
             "documents": {
@@ -88,7 +88,7 @@ def get_system_status_tool(db_service, vectordb_service) -> str:
                 "total_healing_operations": total_healing
             }
         })
-        
+
     except Exception as e:
         return json.dumps({
             "success": False,
@@ -100,11 +100,11 @@ def get_system_status_tool(db_service, vectordb_service) -> str:
 def query_database_tool(sql_query: str, db_service) -> str:
     """
     Execute a SQL query on the database (read-only).
-    
+
     Args:
         sql_query: SQL SELECT query
         db_service: Database service instance
-        
+
     Returns:
         JSON string with query results
     """
@@ -115,15 +115,15 @@ def query_database_tool(sql_query: str, db_service) -> str:
                 "success": False,
                 "error": "Only SELECT queries are allowed"
             })
-        
+
         results = db_service.query(sql_query)
-        
+
         return json.dumps({
             "success": True,
             "num_rows": len(results),
             "results": results[:100]  # Limit to 100 rows
         })
-        
+
     except Exception as e:
         return json.dumps({
             "success": False,
