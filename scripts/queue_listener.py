@@ -31,7 +31,6 @@ def mark_message_processed(message_id):
     queue_modal.set_processed(message_id)
 
 async def watch_queue():
-    """Continuously poll the queue for new messages."""
     print("🚀 Queue watcher started. Waiting for messages...\n")
 
     while True:

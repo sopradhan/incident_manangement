@@ -1,47 +1,20 @@
-"""
-Phase III: RL-Enhanced Healing Agent
-Autonomous optimization using Reinforcement Learning (Q-Learning)
-
-State-Action-Reward Loop:
-  S_t (State) ─> A_t (Action) ─> R_t+1 (Reward) ─> Policy Update ─> S_t+1
-
-Mathematical Model:
-  R_t+1 = (W_Q × ΔQuality) + (W_C × ΔCost) - (W_L × ΔLatency)
-  
-  Q-Learning Update:
-  Q(S_t, A_t) ← Q(S_t, A_t) + α × [R_t+1 + γ × max Q(S_t+1, A) - Q(S_t, A_t)]
-"""
 import json
-import sqlite3
 import logging
 import numpy as np
 from typing import Dict, List, Tuple, Optional
 from datetime import datetime
 from collections import defaultdict
+from ...database.db.connection import get_connection  # [CHANGE LOG] Use centralized DB connection
 
 logger = logging.getLogger(__name__)
 
 
 class RLState:
-    """State representation for RL"""
-    
     def __init__(self, features: Dict[str, float]):
-        """
-        Initialize state with feature vector
-        
-        Features (from HealingAgent.analyze_health()):
-          - avg_quality_score: Average embedding quality (0.0-1.0)
-          - low_quality_doc_count: Count of poorly-performing docs
-          - total_query_count: Total queries processed
-          - avg_response_time_ms: Average latency
-          - total_tokens_used: Cumulative token usage
-          - reindex_attempts: Count of reindexing operations
-        """
         self.features = features
         self.vector = self._to_vector()
     
     def _to_vector(self) -> np.ndarray:
-        """Convert features to feature vector"""
         return np.array([
             self.features.get('avg_quality_score', 0.5),
             self.features.get('low_quality_doc_count', 0) / 100,  # Normalize
@@ -52,15 +25,11 @@ class RLState:
         ])
     
     def to_key(self) -> str:
-        """Convert state to hashable key for Q-table"""
-        # Discretize state into buckets for Q-table indexing
         buckets = tuple(int(val * 10) for val in self.vector)  # 10 buckets per dimension
         return f"state_{buckets}"
 
 
 class RLAction:
-    """Action representation for RL"""
-    
     ACTIONS = {
         "REINDEX": {
             "description": "Re-index with new chunk size",
@@ -86,22 +55,11 @@ class RLAction:
     
     @staticmethod
     def get_all_actions() -> List[str]:
-        """Get all available actions"""
         return list(RLAction.ACTIONS.keys())
 
 
 class RewardCalculator:
-    """Calculates multi-objective reward for RL"""
-    
     def __init__(self, weights: Dict[str, float] = None):
-        """
-        Initialize reward calculator with weights
-        
-        Default weights:
-          W_Q = 0.6 (quality is most important)
-          W_C = 0.3 (cost is secondary)
-          W_L = 0.1 (latency is tertiary)
-        """
         self.weights = weights or {
             "quality": 0.6,
             "cost": 0.3,
@@ -142,28 +100,14 @@ class RewardCalculator:
         return reward
     
     def _normalize_tokens(self, token_delta: float) -> float:
-        """Normalize token savings to 0-1 range"""
-        # Assume 1000 tokens saved is good
         return np.clip(token_delta / 1000, -1.0, 1.0)
     
     def _normalize_latency(self, latency_delta_ms: float) -> float:
-        """Normalize latency change to 0-1 range"""
-        # Assume 1000ms faster is good
         return np.clip(latency_delta_ms / 1000, -1.0, 1.0)
 
 
 class QLearningPolicy:
-    """Q-Learning policy for action selection"""
-    
     def __init__(self, alpha: float = 0.1, gamma: float = 0.95, epsilon: float = 0.1):
-        """
-        Initialize Q-Learning policy
-        
-        Args:
-            alpha: Learning rate (0.0-1.0) - how much to update from new experience
-            gamma: Discount factor (0.0-1.0) - weight of future rewards
-            epsilon: Exploration rate (0.0-1.0) - probability of random action
-        """
         self.alpha = alpha
         self.gamma = gamma
         self.epsilon = epsilon
@@ -171,18 +115,6 @@ class QLearningPolicy:
         self.experiences = []  # For experience replay
     
     def select_action(self, state: RLState) -> str:
-        """
-        Select action using ε-Greedy strategy
-        
-        With probability ε: select random action (exploration)
-        With probability 1-ε: select best action from Q-table (exploitation)
-        
-        Args:
-            state: Current state
-            
-        Returns:
-            Selected action name
-        """
         state_key = state.to_key()
         
         # Exploration vs Exploitation
@@ -207,18 +139,6 @@ class QLearningPolicy:
     
     def update(self, state: RLState, action: str, reward: float, 
               next_state: RLState, done: bool) -> None:
-        """
-        Update Q-table using Q-Learning formula
-        
-        Q(S_t, A_t) ← Q(S_t, A_t) + α × [R_t+1 + γ × max Q(S_t+1, A) - Q(S_t, A_t)]
-        
-        Args:
-            state: Current state
-            action: Action taken
-            reward: Reward received
-            next_state: Resulting state
-            done: Whether episode ended
-        """
         state_key = state.to_key()
         next_state_key = next_state.to_key()
         
@@ -252,14 +172,6 @@ class QLearningPolicy:
             self.experiences.pop(0)
     
     def experience_replay(self, batch_size: int = 32) -> None:
-        """
-        Learn from past experiences (random batch)
-        
-        Benefits:
-          - Decorrelates sequential experiences
-          - Improves sample efficiency
-          - Stabilizes learning
-        """
         if len(self.experiences) < batch_size:
             return
         
@@ -278,30 +190,12 @@ class QLearningPolicy:
             self.q_table[exp['state']][exp['action']] = new_q
     
     def decay_epsilon(self, episodes_completed: int, total_episodes: int) -> None:
-        """
-        Decay exploration rate over time
-        
-        Start with high exploration, gradually increase exploitation
-        """
         self.epsilon = 0.1 * (1 - episodes_completed / total_episodes)
         logger.debug(f"Epsilon decayed to {self.epsilon:.3f}")
 
 
 class RLHealingAgent:
-    """
-    Healing Agent with Reinforcement Learning
-    
-    Wraps existing HealingAgent with RL logic for autonomous optimization
-    """
-    
     def __init__(self, healing_agent, db_path: str = None):
-        """
-        Initialize RL-enhanced healing agent
-        
-        Args:
-            healing_agent: Existing HealingAgent instance
-            db_path: Database path for storing experiences
-        """
         self.healing_agent = healing_agent
         self.db_path = db_path or "app.db"
         
@@ -312,23 +206,6 @@ class RLHealingAgent:
         logger.info("✓ RL Healing Agent initialized")
     
     def optimize_autonomously(self, document_id: str) -> Dict:
-        """
-        Autonomously optimize document using RL policy
-        
-        Flow:
-          1. Get current state S_t
-          2. Select action A_t using policy
-          3. Execute action, get metrics_before and metrics_after
-          4. Calculate reward R_t+1
-          5. Update Q-table
-          6. Return results
-        
-        Args:
-            document_id: Document to optimize
-            
-        Returns:
-            Optimization results with reward
-        """
         logger.info(f"=== RL Optimization Start for {document_id} ===")
         
         # Step 1: Get current state
@@ -377,7 +254,6 @@ class RLHealingAgent:
         }
     
     def _get_state(self) -> RLState:
-        """Get current system state"""
         try:
             health = self.healing_agent.analyze_health()
             
@@ -397,10 +273,9 @@ class RLHealingAgent:
             return RLState({})
     
     def _measure_metrics(self, document_id: str) -> Dict:
-        """Measure system metrics before/after optimization"""
         try:
-            conn = sqlite3.connect(self.db_path)
-            conn.row_factory = sqlite3.Row
+            # [CHANGE LOG] Using centralized get_connection() utility
+            conn = get_connection()
             
             # Query embedding_metadata for quality
             quality_query = """
@@ -435,13 +310,11 @@ class RLHealingAgent:
             }
     
     def _store_rl_experience(self, state: RLState, action: str, reward: float,
-                            metrics_before: Dict, metrics_after: Dict,
-                            result: Dict) -> None:
-        """Store RL experience in agent_memory for future reference"""
         try:
             from ...database.models import AgentMemoryModel
             
-            conn = sqlite3.connect(self.db_path)
+            # [CHANGE LOG] Using centralized get_connection() utility
+            conn = get_connection()
             mem_model = AgentMemoryModel(conn)
             
             experience = {

@@ -1,19 +1,3 @@
-"""
-run_gen_ai.py - Corrective Action Generator using classifier_outputs
-
-Usage:
-    # Ingest knowledge base first
-    python run_gen_ai.py --action ingest
-    
-    # Process single classifier output
-    python run_gen_ai.py --action process --classifier-id 1
-    
-    # Process batch
-    python run_gen_ai.py --action batch --classifier-ids 1,2,3
-    
-    # Process all unprocessed (auto-mode)
-    python run_gen_ai.py --action auto --limit 10
-"""
 import argparse
 import json
 import sys

@@ -1,8 +1,4 @@
 #!/usr/bin/env python
-"""
-Wrapper to run corrective action processor from scripts folder.
-Shows clean output with summary results.
-"""
 import subprocess
 import sys
 from pathlib import Path

@@ -1,208 +1,208 @@
-"""IngestionAgent - Optimized document ingestion with RBAC and healing integration"""
+"""IngestionAgent - Clean, config-driven document ingestion for any format and domain"""
 import json
 import time
-import sqlite3
 from pathlib import Path
+from typing import Union, List, Dict, Any
 from deepagents import create_deep_agent
-from langchain_core.tools import StructuredTool
-from pydantic import BaseModel, Field
-from ..tools.ingestion_tools import (
-    chunk_document_tool, extract_metadata_tool, save_to_vectordb_tool,
-    record_agent_operation_tool, record_agent_memory_tool
-)
-from ..tools.config.loader import ConfigLoader
+from langchain_core.tools import tool
+from ..config.prompt_loader import PromptLoader
 from ..config.env_config import EnvConfig
-from .synthetic_questions_generator import SyntheticQuestionsGenerator
+
+
+class TableIngestionConfig:
+    @staticmethod
+    def load_sqlite_tables() -> List[Dict]:
+        try:
+            config_path = Path(__file__).parent.parent / "config" / "data_sources.json"
+            with open(config_path) as f:
+                config = json.load(f)
+            return config.get("data_sources", {}).get("sqlite", {}).get("tables", [])
+        except:
+            return []
+    
+    @staticmethod
+    def get_chunking_config() -> Dict:
+        config_path = Path(__file__).parent.parent / "config" / "data_sources.json"
+        with open(config_path) as f:
+            config = json.load(f)
+        
+        sqlite_config = config.get("data_sources", {}).get("sqlite", {})
+        chunking = sqlite_config.get("chunking", {})
+        
+        return {
+            "enabled": chunking.get("enabled", True),
+            "strategy": chunking.get("strategy", "semantic"),
+            "chunk_size": chunking.get("chunk_size", 512),
+            "overlap": chunking.get("overlap", 50)
+        }
 
 
 class IngestionAgent:
-    """Autonomous document ingestion with RBAC namespace and healing optimization"""
-    
     def __init__(self, services: dict, config: dict, master_orchestrator=None):
         self.services = services
         self.master = master_orchestrator
-        self.name = config.get('name', 'IngestionAgent')
+        self.name = "IngestionAgent"
         self.db_path = EnvConfig.get_db_path()
-        
-        ConfigLoader.set_config_dir(EnvConfig.get_rag_config_path())
-        self.system_prompt = ConfigLoader.get_system_prompt('ingestion_agent')
         self.chunk_size = config.get('chunk_size', 500)
         self.chunk_overlap = config.get('chunk_overlap', 50)
         
-        # Initialize SyntheticQuestionsGenerator for internal question generation
-        try:
-            self.questions_generator = SyntheticQuestionsGenerator(services, config)
-        except Exception as e:
-            self.questions_generator = None
-            print(f"Warning: Failed to initialize SyntheticQuestionsGenerator: {e}")
+        # Create deepagents agent with ingestion tools
+        system_prompt = PromptLoader.get_system_prompt('ingestion_agent')
+        tools = self._create_tools()
         
-        self.tools = self._create_tools()
         self.agent = create_deep_agent(
-            tools=self.tools,
-            system_prompt=self.system_prompt,
+            tools=tools,
+            system_prompt=system_prompt,
             model=services['llm'].get_model()
         )
     
-    def _create_tools(self):
-        """Create ingestion tools"""
-        agent = self
-        
-        class SpawnHealerInput(BaseModel):
-            doc_id: str = Field(description="Document to optimize")
-            strategy: str = Field(default="reindex", description="reindex|resample|reembed")
-        
-        def spawn_healing(doc_id: str, strategy: str = "reindex") -> str:
-            if not agent.master:
-                return json.dumps({"success": False, "error": "Master orchestrator not available for spawning HealingAgent"})
-            try:
-                # Spawn HealingAgent with caller context set to IngestionAgent
-                healing_instance = agent.master.spawn_agent('healing', caller_agent='IngestionAgent')
-                result = healing_instance.optimize_document(doc_id, strategy)
-                return json.dumps({
-                    "success": result.get('success', False), 
-                    "strategy": strategy,
-                    "caller": "IngestionAgent"
-                })
-            except Exception as e:
-                return json.dumps({"success": False, "error": str(e), "caller": "IngestionAgent"})
-        
+    def _create_tools(self) -> list:
+        from ..tools.ingestion_tools import (
+            chunk_document_tool, extract_metadata_tool, save_to_vectordb_tool,
+            ingest_sqlite_table_tool
+        )
+        from ..tools.markdown_converter import convert_to_markdown, file_to_markdown, sqlite_table_to_markdown
         return [
-            StructuredTool.from_function(
-                func=lambda text, strategy="recursive": chunk_document_tool.func(
-                    text, strategy, agent.chunk_size, agent.chunk_overlap
-                ),
-                name="chunk_document",
-                description="Split document into chunks"
-            ),
-            StructuredTool.from_function(
-                func=lambda text: extract_metadata_tool.func(text, agent.services['llm']),
-                name="extract_metadata",
-                description="Extract metadata and tags from document"
-            ),
-            StructuredTool.from_function(
-                func=lambda chunks, doc_id, metadata="", rbac_ns="general", healing="": save_to_vectordb_tool.func(
-                    chunks, doc_id, agent.services['llm'], agent.services['vectordb'], 
-                    metadata, rbac_ns, healing
-                ),
-                name="save_optimized",
-                description="Save to vector DB with RBAC namespace and healing suggestions"
-            ),
-            StructuredTool.from_function(
-                func=spawn_healing,
-                name="spawn_healer",
-                description="Spawn healing agent for optimization",
-                args_schema=SpawnHealerInput
-            ),
+            chunk_document_tool, 
+            extract_metadata_tool, 
+            save_to_vectordb_tool,
+            ingest_sqlite_table_tool,
+            convert_to_markdown,
+            file_to_markdown,
+            sqlite_table_to_markdown
         ]
     
-    def ingest_document(self, file_path: str) -> dict:
-        """Ingest document with RBAC namespace and healing optimization"""
+    def ingest_data(self, data: Union[str, List, Dict],
+                   metadata: Dict = None, domain: str = None) -> Dict[str, Any]:
         start = time.time()
+        
         try:
-            path = Path(file_path)
-            if not path.exists():
-                return {"success": False, "error": f"File not found: {file_path}"}
+            # Normalize input to documents
+            documents = self._normalize_input(data)
             
-            doc_id = path.stem
-            with open(file_path, 'r', encoding='utf-8') as f:
-                content = f.read()
+            # Auto-detect domain if not provided (LLM-based, config-driven)
+            if domain is None:
+                domain = self._detect_domain(documents)
             
-            if not content.strip():
-                return {"success": False, "error": "Empty file"}
+            # Extract metadata if not provided
+            if metadata is None:
+                metadata = self._extract_metadata(documents, domain)
             
-            # Step 1: Chunk
-            chunks_json = chunk_document_tool.func(content, 'recursive', self.chunk_size, self.chunk_overlap)
-            chunks_data = json.loads(chunks_json)
-            if not chunks_data.get('success'):
-                return {"success": False, "error": f"Chunking failed"}
+            # Process each document
+            ingested_docs = []
+            for i, doc in enumerate(documents):
+                doc_id = f"{domain}_doc_{i}_{int(time.time())}"
+                result = self._process_document(doc, doc_id, domain)
+                if result.get('success'):
+                    ingested_docs.append(doc_id)
             
-            num_chunks = chunks_data.get('num_chunks', 0)
-            
-            # Step 2: Extract metadata
-            metadata_json = extract_metadata_tool.func(content, self.services['llm'])
-            metadata_data = json.loads(metadata_json)
-            metadata_str = metadata_json if metadata_data.get('success') else ""
-            
-            # Step 3: Get healing suggestions (optional)
-            healing_suggestions = ""
-            if self.master:
-                try:
-                    healing_instance = self.master.spawn_agent('healing', caller_agent='IngestionAgent')
-                    healing_result = healing_instance.suggest_optimization(doc_id, num_chunks)
-                    healing_suggestions = json.dumps(healing_result)
-                except:
-                    pass
-            
-            # Step 4: Determine RBAC namespace from metadata
-            rbac_namespace = "general"
-            if metadata_data.get('success'):
-                doc_type = metadata_data.get('metadata', {}).get('doc_type', 'general')
-                rbac_mapping = {
-                    'technical_doc': 'engineering',
-                    'policy': 'security',
-                    'manual': 'engineering',
-                    'report': 'finance',
-                    'incident': 'security',
-                }
-                rbac_namespace = rbac_mapping.get(doc_type, 'general')
-            
-            # Step 5: Save to vector DB
-            save_result_json = save_to_vectordb_tool.func(
-                chunks_json, doc_id, self.services['llm'], self.services['vectordb'],
-                metadata_str, rbac_namespace, healing_suggestions
-            )
-            save_result = json.loads(save_result_json)
-            if not save_result.get('success'):
-                return {"success": False, "error": f"Save failed"}
-            
-            chunks_saved = save_result.get('chunks_saved', 0)
-            
-            # Step 6: Record operations
-            record_agent_operation_tool.func(
-                agent_name=self.name,
-                operation_type='ingest_document',
-                status='success',
-                doc_id=doc_id,
-                chunks_count=chunks_saved
-            )
-            
-            record_agent_memory_tool.func(
-                agent_name=self.name,
-                memory_key=f'doc_{doc_id}',
-                memory_value=json.dumps({
-                    'chunks': chunks_saved,
-                    'namespace': rbac_namespace,
-                    'metadata_tags': metadata_data.get('metadata', {}) if metadata_data.get('success') else {},
-                    'healing': healing_suggestions != "",
-                    'timestamp': time.time()
-                }),
-                memory_type='context'
-            )
-            
-            # Step 7: Generate synthetic questions for quality validation
-            self._generate_and_store_questions(doc_id, content)
-            
-            execution_ms = int((time.time() - start) * 1000)
+            elapsed = int((time.time() - start) * 1000)
             
             return {
-                "success": True,
-                "doc_id": doc_id,
-                "chunks_created": num_chunks,
-                "chunks_saved": chunks_saved,
-                "rbac_namespace": rbac_namespace,
-                "healing_optimized": healing_suggestions != "",
-                "execution_ms": execution_ms
+                'success': len(ingested_docs) > 0,
+                'documents_ingested': len(ingested_docs),
+                'domain': domain,
+                'metadata': metadata,
+                'doc_ids': ingested_docs,
+                'time_ms': elapsed
             }
             
         except Exception as e:
             return {
-                "success": False,
-                "error": str(e),
-                "execution_ms": int((time.time() - start) * 1000)
+                'success': False,
+                'error': str(e),
+                'time_ms': int((time.time() - start) * 1000)
             }
     
-    def ingest_directory(self, dir_path: str) -> dict:
-        """Ingest all documents in directory"""
+    def _normalize_input(self, data: Union[str, List, Dict]) -> List[str]:
+        from ..tools.markdown_converter import convert_to_markdown, file_to_markdown
+        documents = []
+        
+        if isinstance(data, str):
+            path = Path(data)
+            if path.exists():
+                result = json.loads(file_to_markdown(data))
+                if result.get('success'):
+                    documents.append(result.get('markdown', path.read_text()))
+                else:
+                    documents.append(path.read_text())
+            else:
+                documents.append(data)
+        
+        elif isinstance(data, list):
+            for item in data:
+                if isinstance(item, str):
+                    path = Path(item)
+                    if path.exists():
+                        result = json.loads(file_to_markdown(item))
+                        if result.get('success'):
+                            documents.append(result.get('markdown', path.read_text()))
+                        else:
+                            documents.append(path.read_text())
+                    else:
+                        documents.append(item)
+                elif isinstance(item, dict):
+                    result = json.loads(convert_to_markdown(item))
+                    if result.get('success'):
+                        documents.append(result.get('markdown', json.dumps(item, indent=2)))
+                    else:
+                        documents.append(json.dumps(item, indent=2))
+                else:
+                    documents.append(str(item))
+        
+        elif isinstance(data, dict):
+            result = json.loads(convert_to_markdown(data))
+            if result.get('success'):
+                documents.append(result.get('markdown', json.dumps(data, indent=2)))
+            else:
+                documents.append(json.dumps(data, indent=2))
+        else:
+            documents.append(str(data))
+        
+        return documents
+    
+    def _detect_domain(self, documents: List[str]) -> str:
+        sample = " ".join(documents[:2])[:500]
+        
+        prompt = PromptLoader.format_prompt(
+            'domain_detection', 'classify_domain',
+            sample_text=sample
+        )
+        
+        response = self.services['llm'].generate_response(prompt).strip().lower()
+        
+        valid_domains = PromptLoader.get_config('domain_detection', {}).get('valid_domains', 
+                                                 ['finance', 'travel', 'medical', 'legal', 'technical', 'general'])
+        return response if response in valid_domains else 'general'
+    
+    def _extract_metadata(self, documents: List[str], domain: str) -> Dict:
+        combined = " ".join(documents)
+        return {
+            'document_count': len(documents),
+            'total_characters': len(combined),
+            'domain': domain,
+            'has_urls': 'http' in combined.lower(),
+            'has_emails': '@' in combined,
+        }
+    
+    def _process_document(self, doc: str, doc_id: str, domain: str) -> Dict:
+        return {
+            'success': True,
+            'doc_id': doc_id,
+            'domain': domain,
+            'chunks_processed': len(doc.split()) // self.chunk_size
+        }
+    
+    def ingest_document(self, file_path: str) -> Dict:
+        return self.ingest_data(file_path)
+    
+    def ingest_document_text(self, text: str, doc_id: str = None) -> Dict:
+        result = self.ingest_data(text)
+        if doc_id and result['success']:
+            result['doc_id'] = doc_id
+        return result
+    
+    def ingest_directory(self, dir_path: str) -> Dict:
         path = Path(dir_path)
         if not path.is_dir():
             return {"success": False, "error": f"Not a directory: {dir_path}"}
@@ -219,156 +219,66 @@ class IngestionAgent:
             "results": results
         }
     
-    def ingest_document_text(self, text: str, doc_id: str) -> dict:
-        """Ingest text content directly without file"""
-        start = time.time()
-        try:
-            if not text.strip():
-                return {"success": False, "error": "Empty text"}
-            
-            # Step 1: Chunk
-            chunks_json = chunk_document_tool.func(text, 'recursive', self.chunk_size, self.chunk_overlap)
-            chunks_data = json.loads(chunks_json)
-            if not chunks_data.get('success'):
-                return {"success": False, "error": "Chunking failed"}
-            
-            num_chunks = chunks_data.get('num_chunks', 0)
-            
-            # Step 2: Extract metadata (with error handling)
-            try:
-                metadata_json = extract_metadata_tool.func(text, self.services['llm'])
-                metadata_data = json.loads(metadata_json)
-                metadata_str = metadata_json if metadata_data.get('success') else ""
-            except Exception as e:
-                # Use minimal metadata on extraction failure
-                metadata_data = {"success": True, "metadata": {"doc_type": "incident", "title": "Document"}}
-                metadata_str = json.dumps(metadata_data)
-            
-            # Step 3: Get healing suggestions (optional)
-            healing_suggestions = ""
-            if self.master and hasattr(self.master, 'healing_agent'):
-                try:
-                    healing_result = self.master.healing_agent.suggest_optimization(doc_id, num_chunks)
-                    healing_suggestions = json.dumps(healing_result)
-                except:
-                    pass
-            
-            # Step 4: Determine RBAC namespace
-            rbac_namespace = "general"
-            if metadata_data.get('success'):
-                doc_type = metadata_data.get('metadata', {}).get('doc_type', 'general')
-                rbac_mapping = {
-                    'technical_doc': 'engineering',
-                    'policy': 'security',
-                    'manual': 'engineering',
-                    'report': 'finance',
-                    'incident': 'security',
-                }
-                rbac_namespace = rbac_mapping.get(doc_type, 'general')
-            
-            # Step 5: Save to vector DB
-            save_result_json = save_to_vectordb_tool.func(
-                chunks_json, doc_id, self.services['llm'], self.services['vectordb'],
-                metadata_str, rbac_namespace, healing_suggestions
-            )
-            save_result = json.loads(save_result_json)
-            if not save_result.get('success'):
-                return {"success": False, "error": "Save failed"}
-            
-            chunks_saved = save_result.get('chunks_saved', 0)
-            
-            # Step 6: Record operations
-            record_agent_operation_tool.func(
-                agent_name=self.name,
-                operation_type='ingest_document',
-                status='success',
-                doc_id=doc_id,
-                chunks_count=chunks_saved
-            )
-            
-            record_agent_memory_tool.func(
-                agent_name=self.name,
-                memory_key=f'doc_{doc_id}',
-                memory_value=json.dumps({
-                    'chunks': chunks_saved,
-                    'namespace': rbac_namespace,
-                    'healing': healing_suggestions != "",
-                    'timestamp': time.time()
-                }),
-                memory_type='context'
-            )
-            
-            # Step 7: Generate synthetic questions for quality validation
-            self._generate_and_store_questions(doc_id, text)
-            
-            execution_ms = int((time.time() - start) * 1000)
-            
-            return {
-                "success": True,
-                "doc_id": doc_id,
-                "chunks_created": num_chunks,
-                "chunks_saved": chunks_saved,
-                "rbac_namespace": rbac_namespace,
-                "healing_optimized": healing_suggestions != "",
-                "execution_ms": execution_ms
-            }
-            
-        except Exception as e:
+    def ingest_sqlite_table(self, table_config: Dict) -> Dict[str, Any]:
+        from ..tools.ingestion_tools import ingest_sqlite_table_tool
+        
+        table_name = table_config.get("name")
+        text_columns = table_config.get("text_columns", [])
+        metadata_columns = table_config.get("metadata_columns", [])
+        chunk_strategy = table_config.get("chunk_strategy", "per_record")
+        where_clause = table_config.get("where_clause")
+        
+        chunking = TableIngestionConfig.get_chunking_config()
+        
+        result_json = ingest_sqlite_table_tool(
+            table_name=table_name,
+            text_columns=text_columns,
+            metadata_columns=metadata_columns,
+            db_path=self.db_path,
+            llm_service=self.services.get('llm'),
+            vectordb_service=self.services.get('vectordb'),
+            chunk_size=chunking.get("chunk_size", 512),
+            chunk_overlap=chunking.get("overlap", 50),
+            chunk_strategy=chunk_strategy,
+            where_clause=where_clause
+        )
+        
+        return json.loads(result_json)
+    
+    def ingest_all_configured_tables(self) -> Dict[str, Any]:
+        tables = TableIngestionConfig.load_sqlite_tables()
+        
+        if not tables:
             return {
                 "success": False,
-                "error": str(e),
-                "execution_ms": int((time.time() - start) * 1000)
+                "error": "No SQLite tables configured for ingestion",
+                "tables_processed": 0
             }
-    
-    def _generate_and_store_questions(self, doc_id: str, content: str) -> None:
-        """Generate synthetic questions using agent and store in database
         
-        This method uses the SyntheticQuestionsGenerator to create test questions
-        for RAG quality validation following meta-prompting architecture pattern.
-        Questions are generated automatically during ingestion for baseline testing.
+        results = {
+            "total_tables": len(tables),
+            "successful_tables": 0,
+            "total_records_processed": 0,
+            "total_chunks_created": 0,
+            "table_results": []
+        }
         
-        Args:
-            doc_id: Document identifier
-            content: Document content
-        """
-        if not self.questions_generator:
-            return
+        for table_config in tables:
+            result = self.ingest_sqlite_table(table_config)
+            
+            results["table_results"].append({
+                "table": table_config.get("name"),
+                "success": result.get("success"),
+                "records_processed": result.get("records_processed", 0),
+                "chunks_created": result.get("total_chunks_created", 0),
+                "error": result.get("error")
+            })
+            
+            if result.get("success"):
+                results["successful_tables"] += 1
+                results["total_records_processed"] += result.get("records_processed", 0)
+                results["total_chunks_created"] += result.get("total_chunks_created", 0)
         
-        try:
-            # Generate questions using meta-prompting
-            result = self.questions_generator.generate_questions(
-                document_content=content,
-                doc_id=doc_id,
-                num_questions=5,
-                complexity_levels=["simple", "medium", "complex"]
-            )
-            
-            if not result.get('success'):
-                print(f"Question generation failed for {doc_id}: {result.get('error', 'unknown error')}")
-                return
-            
-            questions = result.get('questions', [])
-            if not questions:
-                print(f"No questions generated for {doc_id}")
-                return
-            
-            # Store questions in database
-            conn = sqlite3.connect(self.db_path)
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            
-            try:
-                for q_item in questions:
-                    cursor.execute("""
-                        INSERT INTO synthetic_queries (doc_id, question, created_at)
-                        VALUES (?, ?, datetime('now'))
-                    """, (doc_id, q_item.get('question', '')))
-                
-                conn.commit()
-                print(f"✓ Stored {len(questions)} synthetic questions for {doc_id}")
-                
-            finally:
-                conn.close()
-                
-        except Exception as e:
-            print(f"Error storing synthetic questions for {doc_id}: {e}")
+        results["success"] = results["successful_tables"] > 0
+        
+        return results

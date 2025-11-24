@@ -1,0 +1,64 @@
+{
+  "system_prompts": {
+    "master_orchestrator": "Master orchestrator for RAG system. Spawn specialized subagents (ingestion, retrieval, healing, prompt_modifier) based on tasks. Delegate work and coordinate workflows.",
+    "ingestion_agent": "Ingest documents into knowledge base. Accept any format (files, JSON, text). Normalize, chunk, extract metadata, and save to vector database.",
+    "retrieval_agent": "Retrieve relevant documents from knowledge base. Process queries, enforce RBAC, return ranked results with confidence scores.",
+    "healing_agent": "Optimize RAG system health. Monitor quality metrics, identify issues, recommend optimizations. Execute healing operations.",
+    "prompt_modifying_agent": "Optimize system prompts and refine user queries using meta-prompting. Enhance prompts with context metadata. Make queries clearer, more focused, and more specific."
+  },
+  "metadata_extraction": {
+    "from_query": {
+      "prompt": "Analyze this query and extract metadata in JSON format.\n\nQUERY: {query}\n\nExtract ONLY these fields (use null if not determinable):\n- priority: \"critical\", \"high\", \"medium\", or \"low\" (based on urgency indicators)\n- status: \"active\", \"resolved\", \"pending\", or null (based on query state indicators)\n- environment: \"production\", \"staging\", \"development\", \"testing\", or null\n- query_type: \"diagnostic\", \"configuration\", \"optimization\", \"security\", or \"general\"\n\nReturn ONLY valid JSON, no explanation:",
+      "description": "Extract metadata from user queries"
+    },
+    "from_document": {
+      "prompt": "Analyze this document and extract metadata in JSON format.\n\nDOCUMENT:\n{document_sample}\n\nExtract:\n- doc_type: document classification (e.g., report, manual, policy, contract, guide)\n- title: document title or main topic\n- keywords: array of 3-5 key terms\n- sensitivity: \"public\", \"standard\", \"restricted\", or \"confidential\"\n\nReturn ONLY valid JSON, no explanation:",
+      "description": "Extract metadata from documents"
+    }
+  },
+  "semantic_analysis": {
+    "extract_tags": {
+      "prompt": "Analyze the question and answer to extract semantic tags.\n\nQUESTION: {query}\n\nANSWER: {answer}\n\nExtract 2-5 semantic tags that categorize the answer. Tags should be:\n- Generic and applicable to any domain\n- Descriptive of the solution/topic\n- Useful for search and filtering\n\nReturn ONLY a JSON array of tag strings, no explanation:\n[\"tag1\", \"tag2\", \"tag3\"]",
+      "description": "Extract semantic tags from Q&A"
+    }
+  },
+  "domain_detection": {
+    "classify_domain": {
+      "prompt": "Classify the primary domain/subject area of this document.\n\nDOCUMENT SAMPLE:\n{sample_text}\n\nClassify into ONE of these domains:\n- finance: Financial data, transactions, payments, investments\n- travel: Travel bookings, itineraries, destinations\n- medical: Healthcare, medicine, patient information\n- legal: Contracts, laws, legal agreements\n- technical: Software, systems, APIs, infrastructure\n- general: Unclassified or generic content\n\nReturn ONLY the domain name, nothing else (e.g., \"technical\"):",
+      "description": "Auto-detect domain from document content"
+    }
+  },
+  "rbac": {
+    "determine_namespace": {
+      "prompt": "Based on the document type and metadata, determine the RBAC namespace/access level.\n\nDOCUMENT TYPE: {doc_type}\nMETADATA: {metadata}\n\nDetermine which access namespace this document should belong to:\n- public: General knowledge, no access restrictions\n- standard: Regular content, normal access\n- restricted: Sensitive content, limited access\n- confidential: Highly sensitive, restricted access\n\nConsider:\n- Document classification level (if available)\n- Sensitivity indicators in metadata\n- Domain and content type\n\nReturn ONLY one of: \"public\", \"standard\", \"restricted\", \"confidential\"",
+      "description": "Determine RBAC namespace for document"
+    }
+  },
+  "answer_optimization": {
+    "optimize_answer": {
+      "prompt": "Optimize this answer to be more concise and actionable.\n\nGUIDELINES:\n1. Remove any repetitive or duplicate points\n2. Consolidate similar concepts into single items\n3. Keep only the TOP 5-7 most critical/relevant points\n4. Use clear, concise language appropriate to the content\n5. Maintain accuracy and completeness of key information\n6. Focus on ACTIONABLE recommendations or key takeaways\n7. Target: approximately {token_limit} tokens\n\nORIGINAL ANSWER:\n{answer}\n\nCreate a CONDENSED version that:\n- Eliminates redundancy (e.g., don't repeat key terms unnecessarily)\n- Merges overlapping concepts\n- Prioritizes the most important information\n- Maintains the format (numbered list, paragraphs, etc.) if present\n- Preserves all critical/essential details\n\nReturn ONLY the optimized answer, no preamble or explanations.",
+      "description": "Optimize answer for conciseness and impact"
+    },
+    "quality_check": {
+      "prompt": "Rate if this optimized answer maintains the essential information from the original (0-100):\n\nORIGINAL KEY POINTS:\n{original_answer}\n\nOPTIMIZED VERSION:\n{optimized_answer}\n\nRespond with just a number 0-100.",
+      "description": "Check quality of optimized answer"
+    }
+  },
+  "rag": {
+    "domain_aware_rag": {
+      "prompt": "{system_prompt}\n\n{domain_context}\n\nCONTEXT FROM KNOWLEDGE BASE:\n{context}\n\nREFINED QUERY: {refined_query}\n\nProvide a clear, actionable answer appropriate for this domain.",
+      "description": "RAG prompt with domain context"
+    }
+  },
+  "domain_mappings": {
+    "doc_types": [
+      "report", "manual", "policy", "contract", "guide", "whitepaper", "specification", "incident", "analysis", "summary"
+    ],
+    "domains": [
+      "finance", "travel", "medical", "legal", "technical", "general"
+    ],
+    "namespaces": [
+      "public", "standard", "restricted", "confidential"
+    ]
+  }
+}

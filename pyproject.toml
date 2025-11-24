@@ -14,3 +14,13 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.incident-iq]
+# Database configuration
+database-dir = "data"
+database-name = "incident_iq.db"
+
+# Vector DB configuration
+vector-db-dir = "data/chroma_db"
+
+# Paths are relative to the package root (src/incident_iq)

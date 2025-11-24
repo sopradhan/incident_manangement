@@ -11,12 +11,26 @@ class ConfigLoader:
 
     _config_dir: Optional[str] = None
     _cache: Dict[str, Any] = {}
+    _initialized: bool = False  # [CHANGE LOG] Added lazy initialization guard to prevent re-initialization
 
     @classmethod
     def set_config_dir(cls, config_dir: str) -> None:
-        """Set base config directory"""
+        """Set base config directory - uses lazy initialization guard to prevent redundant re-initialization
+        
+        [CHANGE LOG] OPTIMIZATION - Option 2 Implementation:
+        - WHY: master_orchestrator + 3 sub-agents (retrieval/healing/ingestion) all called this independently
+        - WHAT: Added _initialized flag to make subsequent calls no-ops (only first call takes effect)
+        - WHERE: Called by master_orchestrator.__init__(), sub-agents skip redundant calls
+        - WHEN: One-time init during app startup, 3 subsequent agent calls are skipped
+        - IMPACT: Eliminates 3 redundant cache clears and directory resets per agent spawn
+        """
+        if cls._initialized:
+            # [CHANGE LOG] Already initialized - skip redundant setup
+            return
+        
         cls._config_dir = config_dir
         cls._cache.clear()
+        cls._initialized = True  # [CHANGE LOG] Mark as initialized to guard against re-initialization
 
     @classmethod
     def _load_json_file(cls, filename: str) -> Dict[str, Any]:

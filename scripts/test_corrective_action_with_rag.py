@@ -1,13 +1,4 @@
 #!/usr/bin/env python3
-"""
-Test corrective action processor with new RAG agents.
-Tests:
-- IngestionAgent with synthetic question generation
-- HealingAgent with validation
-- RetrievalAgent for context
-- MasterOrchestrator integration
-- End-to-end corrective action generation
-"""
 
 import sys
 import os
@@ -71,7 +62,6 @@ class RAGAgentTester:
             raise
     
     def test_ingestion_with_synthetic_questions(self) -> Dict[str, Any]:
-        """Test IngestionAgent with synthetic question generation"""
         logger.info("\n" + "="*70)
         logger.info("TEST 1: IngestionAgent with Synthetic Questions")
         logger.info("="*70)
@@ -172,7 +162,6 @@ class RAGAgentTester:
             return {'success': False, 'error': str(e)}
     
     def test_healing_agent_with_synthetic_questions(self, doc_id: str) -> Dict[str, Any]:
-        """Test HealingAgent with synthetic question validation"""
         logger.info("\n" + "="*70)
         logger.info("TEST 2: HealingAgent with Synthetic Question Validation")
         logger.info("="*70)
@@ -224,7 +213,6 @@ class RAGAgentTester:
             return {'success': False, 'error': str(e)}
     
     def test_retrieval_agent_with_synthetic_questions(self, doc_id: str) -> Dict[str, Any]:
-        """Test RetrievalAgent with synthetic question retrieval"""
         logger.info("\n" + "="*70)
         logger.info("TEST 3: RetrievalAgent with Synthetic Question Retrieval")
         logger.info("="*70)

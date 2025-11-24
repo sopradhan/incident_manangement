@@ -304,3 +304,212 @@ def record_agent_spawn_tool(parent_agent: str, child_agent: str,
         
     except Exception as e:
         return json.dumps({"success": False, "error": str(e)})
+
+
+@tool
+def ingest_sqlite_table_tool(table_name: str, text_columns: list, metadata_columns: list = None,
+                            db_path: str = None, llm_service=None, vectordb_service=None,
+                            chunk_size: int = 512, chunk_overlap: int = 50,
+                            chunk_strategy: str = "per_record", where_clause: str = None) -> str:
+    """
+    Generic tool to ingest any SQLite table into RAG vector database
+    
+    Args:
+        table_name: Name of SQLite table to ingest (e.g., "knowledge_base", "incidents", "policies")
+        text_columns: List of column names to combine as searchable text
+        metadata_columns: List of column names to attach as metadata (optional)
+        db_path: Path to SQLite database (uses config if None)
+        llm_service: LLM service for embeddings
+        vectordb_service: Vector DB service (Chroma)
+        chunk_size: Semantic chunk size in tokens
+        chunk_overlap: Overlap between chunks in tokens
+        chunk_strategy: "per_record" (one document per row) or "sequential" (combine rows)
+        where_clause: Optional SQL WHERE clause for filtering records (e.g., "environment = 'prod'")
+    
+    Returns:
+        JSON with ingestion status and statistics
+        
+    Example:
+        result = ingest_sqlite_table_tool(
+            table_name="policies",
+            text_columns=["policy_title", "policy_content", "guidelines"],
+            metadata_columns=["policy_id", "category", "department", "effective_date"],
+            chunk_strategy="per_record",
+            where_clause="status = 'active'"
+        )
+    """
+    try:
+        # Use config database path if not provided
+        if db_path is None:
+            db_path = EnvConfig.get_db_path()
+        
+        # Connect to database
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        # Validate table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table_name,))
+        if not cursor.fetchone():
+            conn.close()
+            return json.dumps({
+                "success": False,
+                "error": f"Table '{table_name}' does not exist in database"
+            })
+        
+        # Build query
+        query = f"SELECT * FROM {table_name}"
+        if where_clause:
+            query += f" WHERE {where_clause}"
+        
+        # Fetch all records
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        conn.close()
+        
+        if not rows:
+            return json.dumps({
+                "success": False,
+                "error": f"No records found in table '{table_name}'"
+            })
+        
+        # Process records based on chunk strategy
+        documents = []
+        
+        if chunk_strategy == "per_record":
+            # One document per database record
+            for row in rows:
+                row_dict = dict(row)
+                
+                # Combine text columns into document content
+                text_parts = []
+                for col in text_columns:
+                    if col in row_dict and row_dict[col]:
+                        value = row_dict[col]
+                        text_parts.append(f"{col}: {value}")
+                
+                document_text = "\n".join(text_parts)
+                
+                if document_text.strip():
+                    # Extract metadata
+                    metadata = {}
+                    if metadata_columns:
+                        for col in metadata_columns:
+                            if col in row_dict:
+                                metadata[col] = row_dict[col]
+                    
+                    documents.append({
+                        "text": document_text,
+                        "metadata": metadata,
+                        "table": table_name
+                    })
+        
+        elif chunk_strategy == "sequential":
+            # Combine records sequentially (multiple records per document)
+            combined_text_parts = []
+            combined_metadata = {"record_count": 0}
+            
+            for row in rows:
+                row_dict = dict(row)
+                text_parts = []
+                
+                for col in text_columns:
+                    if col in row_dict and row_dict[col]:
+                        value = row_dict[col]
+                        text_parts.append(f"{col}: {value}")
+                
+                document_section = "\n".join(text_parts)
+                if document_section.strip():
+                    combined_text_parts.append(f"--- Record ---\n{document_section}")
+                    combined_metadata["record_count"] += 1
+            
+            if combined_text_parts:
+                documents.append({
+                    "text": "\n\n".join(combined_text_parts),
+                    "metadata": combined_metadata,
+                    "table": table_name
+                })
+        
+        else:
+            conn.close()
+            return json.dumps({
+                "success": False,
+                "error": f"Unknown chunk_strategy: {chunk_strategy}. Use 'per_record' or 'sequential'"
+            })
+        
+        if not documents:
+            return json.dumps({
+                "success": False,
+                "error": "No documents created after processing records"
+            })
+        
+        # Chunk each document semantically
+        splitter = RecursiveCharacterTextSplitter(
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+            separators=["\n\n", "\n", ". ", " ", ""]
+        )
+        
+        ingestion_results = {
+            "table_name": table_name,
+            "records_processed": len(rows),
+            "documents_created": len(documents),
+            "chunks": []
+        }
+        
+        # Process each document
+        chunk_counter = 0
+        for doc_idx, doc in enumerate(documents):
+            # Chunk the document
+            chunks = splitter.split_text(doc["text"])
+            
+            for chunk_idx, chunk_text in enumerate(chunks):
+                if not chunk_text.strip():
+                    continue
+                
+                # Generate chunk ID
+                chunk_id = f"{table_name}_doc_{doc_idx}_chunk_{chunk_idx}_{int(datetime.datetime.now().timestamp() * 1000)}"
+                
+                # Generate embedding
+                embedding = llm_service.generate_embedding(chunk_text)
+                
+                # Prepare chunk metadata
+                chunk_metadata = {
+                    "table": table_name,
+                    "document_index": doc_idx,
+                    "chunk_index": chunk_idx,
+                    "chunk_strategy": chunk_strategy,
+                    "source_records": len(rows) if chunk_strategy == "sequential" else 1,
+                    **doc["metadata"]
+                }
+                
+                # Save to vector DB
+                vectordb_service.collection.add(
+                    ids=[chunk_id],
+                    documents=[chunk_text],
+                    embeddings=[embedding],
+                    metadatas=[chunk_metadata]
+                )
+                
+                ingestion_results["chunks"].append({
+                    "chunk_id": chunk_id,
+                    "chunk_size": len(chunk_text),
+                    "metadata": chunk_metadata
+                })
+                
+                chunk_counter += 1
+        
+        ingestion_results["total_chunks_created"] = chunk_counter
+        
+        return json.dumps({
+            "success": True,
+            **ingestion_results
+        })
+        
+    except Exception as e:
+        import traceback
+        return json.dumps({
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        })
