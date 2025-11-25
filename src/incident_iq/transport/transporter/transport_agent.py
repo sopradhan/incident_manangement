@@ -23,20 +23,11 @@ class IntelligentTicketingAgent:
     """Intelligent agent that autonomously decides which MCP tools to call"""
 
     def __init__(self):
-        self.llm = self.llm = ChatOllama(
+        self.llm = ChatOllama(
             model="llama3.2",
             base_url="http://localhost:11434",
         )    
         
-        # Define the tools the LLM can use
-        self.tools = [
-            create_jira_issue,
-            post_slack_alert
-        ]
-        
-        # Bind tools to LLM
-        self.llm_with_tools = self.llm.bind_tools(self.tools)
-
     def _describe_context(self, context: IncidentContext) -> str:
         parts = []
         if not context.business_hours:
@@ -133,7 +124,7 @@ class IntelligentTicketingAgent:
         reasoning_text = ""
         try:
             # Get LLM response with tool binding
-            response = self.llm_with_tools.invoke(messages)
+            response = self.llm.invoke(messages)
             print(response) 
 
             # Check if LLM wants to call tools
