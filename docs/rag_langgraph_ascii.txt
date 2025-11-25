@@ -1,0 +1,42 @@
+
+RAG Master Agent LangGraph Flow:
+
+┌───────────────┐
+│   __start__   │  ← Entry point
+└───────┬───────┘
+        │
+┌───────▼───────┐
+│ PatchToolCalls│  ← Tool call preprocessing
+│   Middleware  │
+└───────┬───────┘
+        │
+┌───────▼───────┐
+│Summarization  │  ← Conversation management
+│  Middleware   │
+└───────┬───────┘
+        │
+┌───────▼───────┐
+│     model     │ ◄──── LLM with TodoList tools
+│ (LLM Process) │       │
+└───────┬───────┘       │
+        │               │
+┌───────▼───────┐       │
+│     tools     │ ──────┘ Tool execution loop
+│ (TodoList)    │
+└───────────────┘
+        │
+┌───────▼───────┐
+│    __end__    │  ← Final output
+└───────────────┘
+
+State Management:
+├── TodoList State (task tracking)
+├── Conversation State (dialogue context)
+├── Agent State (coordination data)
+└── Metrics State (performance data)
+
+SubAgent Integration:
+├── Master coordinates through LLM decisions
+├── Subagents execute via delegation pattern
+├── Results flow back through state management
+└── TodoList tracks entire coordination workflow

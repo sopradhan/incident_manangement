@@ -218,37 +218,6 @@ def save_to_vectordb_tool(chunks: str, doc_id: str, llm_service, vectordb_servic
         return json.dumps({"success": False, "error": str(e)})
 
 
-@tool
-def record_agent_operation_tool(agent_name: str, operation_type: str, status: str,
-                               doc_id: str, chunks_count: int) -> str:
-    """Record agent operation in database"""
-    try:
-        rag_db_path = EnvConfig.get_db_path()
-        rag_conn = sqlite3.connect(rag_db_path)
-        cursor = rag_conn.cursor()
-        
-        # Insert directly to match actual table schema
-        cursor.execute("""
-            INSERT INTO agent_operations 
-            (agent_id, operation_type, status, input_data, output_data, error_message, timestamp)
-            VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
-        """, (
-            agent_name,
-            operation_type,
-            status,
-            json.dumps({"doc_id": doc_id}),
-            json.dumps({"chunks_created": chunks_count}),
-            None
-        ))
-        
-        rag_conn.commit()
-        rag_conn.close()
-        return json.dumps({"success": True})
-        
-    except Exception as e:
-        print(f"[WARNING] Failed to record operation: {str(e)}")
-        return json.dumps({"success": False, "error": str(e)})
-
 
 @tool
 def record_agent_memory_tool(agent_name: str, memory_key: str, memory_value: str, 
@@ -275,34 +244,6 @@ def record_agent_memory_tool(agent_name: str, memory_key: str, memory_value: str
         
     except Exception as e:
         print(f"[WARNING] Failed to record memory: {str(e)}")
-        return json.dumps({"success": False, "error": str(e)})
-
-
-@tool
-def record_agent_spawn_tool(parent_agent: str, child_agent: str, 
-                           task_description: str, status: str = "spawned") -> str:
-    """Record agent spawning event"""
-    try:
-        rag_db_path = EnvConfig.get_db_path()
-        rag_conn = sqlite3.connect(rag_db_path)
-        
-        from ...database.models import BaseModel
-        spawn_model = BaseModel(rag_conn)
-        spawn_model.table = 'agent_spawns'
-        
-        spawn_model.insert({
-            'parent_agent': parent_agent,
-            'child_agent': child_agent,
-            'task_description': task_description,
-            'status': status,
-            'created_at': datetime.datetime.now().isoformat(),
-            'completed_at': None
-        })
-        
-        rag_conn.close()
-        return json.dumps({"success": True})
-        
-    except Exception as e:
         return json.dumps({"success": False, "error": str(e)})
 
 

@@ -6,6 +6,7 @@ from langchain_core.tools import tool
 
 @tool
 def convert_to_markdown(data: Union[str, Dict, List], source_type: str = "auto") -> str:
+    """Convert dict/list/string data to markdown format"""
     try:
         if isinstance(data, dict):
             md = _dict_to_markdown(data)
@@ -49,6 +50,7 @@ def _list_to_markdown(data: List) -> str:
 
 @tool
 def sqlite_table_to_markdown(db_path: str, table_name: str, text_columns: List[str]) -> str:
+    """Convert SQLite table rows to markdown format"""
     try:
         conn = sqlite3.connect(db_path)
         conn.row_factory = sqlite3.Row
@@ -64,6 +66,7 @@ def sqlite_table_to_markdown(db_path: str, table_name: str, text_columns: List[s
 
 @tool
 def file_to_markdown(file_path: str) -> str:
+    """Convert file (JSON/TXT/CSV/PDF/DOCX) to markdown format"""
     try:
         from pathlib import Path
         ext = Path(file_path).suffix.lower()

@@ -24,7 +24,7 @@ class LLMService:
         Initialize LLM service with configuration
         
         Args:
-            config: Dictionary from llm_config.yaml
+            config: Dictionary from llm_config.json
         """
         self.config = config
         self.provider = config.get('default_provider', 'openai')
@@ -41,12 +41,17 @@ class LLMService:
         provider_config = self.providers_config.get(self.provider, {})
         
         if not provider_config.get('enabled', False):
-            # Find first enabled provider
-            for name, cfg in self.providers_config.items():
-                if cfg.get('enabled', False):
-                    self.provider = name
-                    provider_config = cfg
-                    break
+            # Find first enabled provider, checking HuggingFace first
+            if self.providers_config.get('huggingface', {}).get('enabled', False):
+                self.provider = 'huggingface'
+                provider_config = self.providers_config['huggingface']
+            else:
+                # Try other providers
+                for name, cfg in self.providers_config.items():
+                    if name != 'huggingface' and cfg.get('enabled', False):
+                        self.provider = name
+                        provider_config = cfg
+                        break
         
         try:
             if self.provider == 'openai':
@@ -61,9 +66,16 @@ class LLMService:
                 raise ValueError(f"Unsupported LLM provider: {self.provider}")
         except Exception as e:
             print(f"[ERROR] Failed to initialize {self.provider}: {e}")
-            # Fallback to Ollama
-            print("[INFO] Falling back to Ollama")
-            return self._create_ollama(self.providers_config.get('ollama', {}))
+            # Only fallback to Ollama if it's enabled and accessible
+            if self.providers_config.get('ollama', {}).get('enabled', False):
+                print("[INFO] Falling back to Ollama")
+                try:
+                    return self._create_ollama(self.providers_config.get('ollama', {}))
+                except Exception as e2:
+                    print(f"[ERROR] Ollama fallback also failed: {e2}")
+                    raise e  # Raise original error
+            else:
+                raise  # Re-raise the original exception
     
     def _create_openai(self, config: dict) -> BaseChatModel:
         """Create OpenAI chat model"""
@@ -99,27 +111,16 @@ class LLMService:
         """Create HuggingFace chat model using OpenAI-compatible API"""
         from langchain_openai import ChatOpenAI
         
-        # Get API token - check if it's a key or env var name
-        api_token = config.get('api_key_env')
-        
-        # If it starts with 'hf_', it's the actual key
-        if api_token and api_token.startswith('hf_'):
-            pass  # Use it directly
-        elif api_token:
-            # It's an env var name
-            api_token = os.getenv(api_token)
+        # Get API token from environment variable
+        api_token = os.getenv('HUGGINGFACE_API_KEY') or os.getenv('HF_TOKEN')
         
         if not api_token:
-            api_token = os.getenv('HUGGINGFACEHUB_API_TOKEN') or os.getenv('HF_TOKEN')
-        
-        if not api_token:
-            raise ValueError("HuggingFace API token not found")
+            raise ValueError("HuggingFace API token not found in HUGGINGFACE_API_KEY or HF_TOKEN")
         
         # Use HuggingFace's router endpoint (OpenAI-compatible chat completions API)
-        # Use models like: meta-llama/Llama-3.3-70B-Instruct, deepseek-ai/DeepSeek-R1
         return ChatOpenAI(
             model=config.get('model', 'meta-llama/Llama-3.3-70B-Instruct'),
-            base_url="https://router.huggingface.co/v1",  # Correct path: /v1 not /v1/
+            base_url="https://router.huggingface.co/v1",
             api_key=api_token,
             temperature=config.get('temperature', 0.7),
             max_tokens=config.get('max_tokens', 512)

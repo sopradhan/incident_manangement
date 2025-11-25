@@ -29,7 +29,7 @@
       "model": "meta-llama/Llama-3.3-70B-Instruct",
       "temperature": 0.7,
       "max_tokens": 1024,
-      "enabled": false
+      "enabled": true
     }
   },
   "default_provider": "ollama",
@@ -51,7 +51,13 @@
       "api_key_env": "OPENAI_API_KEY",
       "model": "text-embedding-3-small",
       "enabled": false
+    },
+    "huggingface": {
+      "type": "huggingface",
+      "api_key_env": "HUGGINGFACE_API_KEY",
+      "model": "sentence-transformers/all-MiniLM-L6-v2",
+      "enabled": false
     }
   },
-  "default_embedding_provider": "sentence_transformers"
+  "default_embedding_provider": "ollama"
 }

@@ -1,308 +1,307 @@
-"""Master Orchestrator - Main entry point for RAG system using deepagents"""
+"""
+RAG Master Orchestrator - Clean deepagents implementation with SubAgentMiddleware
+"""
 import json
 import time
+from typing import Dict, Any, Optional, List, Union
+from datetime import datetime
 from pathlib import Path
+
 from deepagents import create_deep_agent
-from ..config.prompt_loader import PromptLoader
-from ..tools.services.llm_service import LLMService
-from ..tools.services.vectordb_service import VectorDBService
-from ...database.db.connection import get_connection  # [CHANGE LOG] Use centralized DB connection
+from deepagents.middleware.subagents import SubAgentMiddleware
+from langchain_core.tools import tool
+from langchain.agents.middleware import AgentMiddleware
 
+# Import subagent classes
+from .ingestion_subagent import IngestionSubAgent
+from .retrieval_subagent import RetrievalSubAgent
 
-class MasterOrchestrator:
-    def __init__(self, config_dir: str = None):
-        from ..config.env_config import EnvConfig
-        from ..config.loader import ConfigLoader
-        
-        # Initialize configuration (lazy init via Option 2)
-        if config_dir is None:
-            config_dir = EnvConfig.get_rag_config_path()
-        ConfigLoader.set_config_dir(config_dir)  # CHANGE LOG: Called once per init
-        
-        # Initialize services
-        self.llm_service = LLMService(ConfigLoader.get_llm_config())
-        self.vectordb_service = VectorDBService(EnvConfig.get_chroma_db_path())
-        self.db_path = EnvConfig.get_db_path()
-        
-        # Initialize shared utilities for subagents
-        from .prompt_utility import PromptUtility
-        self.prompt_utility = PromptUtility(self.llm_service)
-        
-        self.services = {
-            'llm': self.llm_service,
-            'vectordb': self.vectordb_service,
-            'db': get_connection(),  # [CHANGE LOG] Using centralized get_connection()
-            'prompt_utility': self.prompt_utility,  # Shared utility for all subagents
-        }
-        
-        # Get configurations
-        self.agent_config = ConfigLoader.get_agent_config()
-        self.name = "MasterOrchestrator"
-        
-        # Define subagents for deepagents
-        # [CHANGE LOG] Proper deepagents subagent pattern - subagents handle specialized tasks
-        subagents = self._define_subagents()
-        
-        # Create deepagents master agent with subagents
-        # Master agent uses subagents via automatic task tool
-        system_prompt = PromptLoader.get_system_prompt('master_orchestrator')
-        self.agent = create_deep_agent(
-            tools=self._get_master_tools(),  # [CHANGE LOG] Master agent tools (NOT subagent tools)
-            system_prompt=system_prompt,
-            subagents=subagents,  # Subagents available via task tool
-            model=self.llm_service.get_model()
-        )
+# Global reference to the master agent instance
+_rag_master_agent_instance = None
+
+def set_rag_master_agent_instance(agent_instance):
+    global _rag_master_agent_instance
+    _rag_master_agent_instance = agent_instance
+
+@tool
+def ingest_document(document_path: str) -> str:
+    """Ingest a document from a file path."""
+    if _rag_master_agent_instance is None:
+        return "Error: Master agent instance not set."
+    return _rag_master_agent_instance.ingestion_subagent.execute({'data': document_path})
+
+@tool
+def retrieve_info(query: str) -> str:
+    """Retrieve information from the vector database."""
+    if _rag_master_agent_instance is None:
+        return "Error: Master agent instance not set."
+    return _rag_master_agent_instance.retrieval_subagent.execute({'query': query})
+
+class RAGToolMiddleware(AgentMiddleware):
+    tools = [ingest_document, retrieve_info]
+
+class RAGMasterAgent:
+    """Clean RAG Master Orchestrator using deepagents SubAgentMiddleware."""
     
-    def _define_subagents(self) -> list:
-        return [
-            {
-                "name": "ingestion",
-                "description": "Ingest documents in any format (files, JSON, text). Auto-detect domain, extract metadata, normalize and store documents. Can use prompt_utility (from services) to optimize extraction prompts.",
-                "prompt": PromptLoader.get_system_prompt('ingestion_agent'),
-                "tools": self._get_ingestion_tools(),
-                "model": self.llm_service.get_model(),
-            },
-            {
-                "name": "retrieval",
-                "description": "Retrieve relevant documents from knowledge base. Perform semantic search, enforce RBAC permissions, detect query complexity. Can use prompt_utility to refine complex queries and generate search variants.",
-                "prompt": PromptLoader.get_system_prompt('retrieval_agent'),
-                "tools": self._get_retrieval_tools(),
-                "model": self.llm_service.get_model(),
-            },
-            {
-                "name": "healing",
-                "description": "Optimize RAG system health using RL-based learning. Analyze system metrics, recommend optimizations, execute improvements with Q-Learning. Can use prompt_utility to optimize prompts for better LLM decisions.",
-                "prompt": PromptLoader.get_system_prompt('healing_agent'),
-                "tools": self._get_healing_tools(),
-                "model": self.llm_service.get_model(),
-            },
-        ]
+    def __init__(self, services: Optional[Dict[str, Any]] = None, config: Optional[Dict] = None):
+        """Initialize master orchestrator with automatic service setup or provided services."""
+        self.config = config or {'verbose': True}
+        self.name = "RAGMasterAgent"
+        
+        # Configure verbose logging FIRST (needed for service initialization)
+        self.verbose = self.config.get('verbose', True)
+        
+        # Initialize services automatically if not provided
+        if services is None:
+            services = self._initialize_services()
+        
+        self.services = services
+        self.llm_service = services.get("llm")
+        self.vectordb_service = services.get("vectordb") 
+        
+        # Initialize metrics
+        self.metrics = {"operations": 0, "ingestion": 0, "retrieval": 0, "errors": 0}
+        
+        # Initialize subagent instances
+        self.ingestion_subagent = IngestionSubAgent(services, parent=self)
+        self.retrieval_subagent = RetrievalSubAgent(services, parent=self)
+        
+        # Setup agent with subagent middleware
+        set_rag_master_agent_instance(self)
+        self._create_agent()
     
-    def _get_master_tools(self) -> list:
-        from langchain_core.tools import tool
-        
-        @tool
-        def extract_user_intent(query: str) -> str:
-            try:
-                prompt = PromptLoader.format_prompt(
-                    'metadata_extraction', 'from_query',
-                    query=query
-                )
-                response = self.llm_service.generate_response(prompt)
-                return response
-            except Exception as e:
-                return f"Error extracting intent: {e}"
-        
-        @tool
-        def consolidate_results(retrieval_results: str, healing_analysis: str) -> str:
-            try:
-                # [CHANGE LOG] Master uses this tool to combine subagent outputs
-                return json.dumps({
-                    "success": True,
-                    "consolidation": "Results combined from subagents"
-                })
-            except Exception as e:
-                return json.dumps({"success": False, "error": str(e)})
-        
-        return [extract_user_intent, consolidate_results]
-    
-    def _get_ingestion_tools(self) -> list:
-        from ..tools.ingestion_tools import (
-            chunk_document_tool, extract_metadata_tool, save_to_vectordb_tool
-        )
-        return [chunk_document_tool, extract_metadata_tool, save_to_vectordb_tool]
-    
-    def _get_retrieval_tools(self) -> list:
-        from langchain_core.tools import tool
-        import json
-        
-        @tool
-        def search_vector_db(query: str, top_k: int = 5) -> str:
-            try:
-                embedding = self.services['llm'].generate_embedding(query)
-                collection = self.services['vectordb'].collection
-                results = collection.query(query_embeddings=[embedding], n_results=top_k)
-                
-                docs = results.get('documents', [[]])[0]
-                distances = results.get('distances', [[]])[0]
-                
-                formatted = [
-                    {"content": doc[:500], "relevance": round(1 - dist, 3)}
-                    for doc, dist in zip(docs, distances)
-                ]
-                
-                return json.dumps({"success": True, "results": formatted})
-            except Exception as e:
-                return json.dumps({"success": False, "error": str(e)})
-        
-        return [search_vector_db]
-    
-    def _get_healing_tools(self) -> list:
-        from langchain_core.tools import tool
-        import json
-        
-        @tool
-        def analyze_system_health() -> str:
-            try:
-                # [CHANGE LOG] Using centralized get_connection() utility
-                conn = get_connection()
-                cursor = conn.cursor()
-                cursor.execute("SELECT COUNT(*) FROM embedding_metadata")
-                total_chunks = cursor.fetchone()[0]
-                cursor.execute("SELECT AVG(quality_score) FROM embedding_metadata")
-                avg_quality = cursor.fetchone()[0] or 0.85
-                conn.close()
-                
-                status = "healthy" if avg_quality > 0.85 else "needs_optimization"
-                return json.dumps({
-                    "success": True,
-                    "total_chunks": total_chunks,
-                    "avg_quality": round(avg_quality, 3),
-                    "status": status
-                })
-            except Exception as e:
-                return json.dumps({"success": False, "error": str(e)})
-        
-        return [analyze_system_health]
-    
-    def ask_question(self, query: str, enable_healing: bool = True, enable_prompt_refinement: bool = True) -> dict:
-        start_time = time.time()
-        original_query = query
-        refined_query = query
-        
+    def _initialize_services(self) -> Dict[str, Any]:
+        """Initialize real services automatically."""
         try:
-            # Optional query refinement via shared prompt utility
-            # (subagents like retrieval can also use prompt_utility for internal optimization)
-            if enable_prompt_refinement:
-                refined_query = self.prompt_utility.refine_query(query)
+            from langchain_ollama import ChatOllama, OllamaEmbeddings
+            import chromadb
             
-            # Extract metadata from query (LLM-based, config-driven)
-            metadata = self._extract_query_metadata(refined_query)
+            # Real Ollama LLM with optimized settings to prevent crashes
+            class SimpleLLMService:
+                def __init__(self):
+                    self.llm = ChatOllama(
+                        model="qwen2.5:0.5b",
+                        base_url="http://localhost:11434",
+                        temperature=0,
+                        num_ctx=2048,  # Reduced context window to prevent OOM
+                        num_predict=512,  # Limit output tokens
+                        repeat_penalty=1.1
+                    )
+                    self._embeddings = OllamaEmbeddings(
+                        model="nomic-embed-text",
+                        base_url="http://localhost:11434"
+                    )
+                    
+                def generate_embedding(self, text: str):
+                    return self._embeddings.embed_query(text)
+                
+                def generate_response(self, prompt: str) -> str:
+                    response = self.llm.invoke(prompt)
+                    return response.content
             
-            # Retrieve documents via subagent (deepagents task tool)
-            retrieval_prompt = f"Search for documents related to: {refined_query}"
-            retrieval_result = self.agent.invoke({
-                "messages": [{"role": "user", "content": retrieval_prompt}]
-            })
+            # Real ChromaDB
+            class SimpleVectorDBService:
+                def __init__(self):
+                    self.client = chromadb.PersistentClient(path="src/incident_iq/database/data/chroma_db")
+                    try:
+                        self.collection = self.client.get_collection("documents")
+                    except:
+                        self.collection = self.client.create_collection("documents")
+                
+                def search(self, query, top_k=5):
+                    # Simple search implementation
+                    results = self.collection.query(query_texts=[query], n_results=top_k)
+                    return results
             
-            # Get RAG context
-            rag_context = self._extract_context(retrieval_result)
+            llm_service = SimpleLLMService()
+            vectordb_service = SimpleVectorDBService()
             
-            # Generate answer with domain context (domain-agnostic)
-            answer = self._generate_answer(refined_query, rag_context, metadata)
-            
-            # Extract tags (semantic analysis via LLM)
-            tags = self._extract_tags(refined_query, answer)
-            
-            # Optional healing optimization (uses RL)
-            healing_analysis = None
-            if enable_healing:
-                healing_result = self._optimize_answer(answer, refined_query)
-                if healing_result.get('success'):
-                    answer = healing_result.get('optimized_answer', answer)
-                    healing_analysis = {
-                        "status": "optimization_applied",
-                        "original_tokens": healing_result.get('original_tokens'),
-                        "optimized_tokens": healing_result.get('optimized_tokens'),
-                        "reduction_percentage": healing_result.get('reduction_percentage')
-                    }
-            
-            # Record operation
-            self._record_operation(original_query, answer, tags, metadata)
-            
-            exec_ms = int((time.time() - start_time) * 1000)
-            
-            return {
-                "success": True,
-                "original_query": original_query,
-                "refined_query": refined_query,
-                "answer": answer,
-                "tags": tags,
-                "metadata": metadata,
-                "healing_analysis": healing_analysis,
-                "execution_ms": exec_ms
-            }
+            if self.verbose:
+                print("✅ [INIT] Real services initialized automatically")
+                
+            return {"llm": llm_service, "vectordb": vectordb_service}
             
         except Exception as e:
-            return {
-                "success": False,
-                "original_query": original_query,
-                "error": str(e),
-                "execution_ms": int((time.time() - start_time) * 1000)
-            }
+            raise RuntimeError(f"Failed to initialize services: {str(e)}. Ensure Ollama is running.")
     
-    def _extract_query_metadata(self, query: str) -> dict:
-        try:
-            prompt = PromptLoader.format_prompt(
-                'metadata_extraction', 'from_query',
-                query=query
-            )
-            response = self.llm_service.generate_response(prompt)
-            return json.loads(response)
-        except:
-            return {'priority': 'medium', 'query_type': 'general'}
-    
-    def _extract_context(self, retrieval_result: dict) -> str:
-        if isinstance(retrieval_result, dict):
-            if 'context' in retrieval_result:
-                return retrieval_result['context']
-            if 'results' in retrieval_result:
-                return "\n".join([str(r) for r in retrieval_result['results']])
-        return ""
-    
-    def _generate_answer(self, query: str, context: str, metadata: dict) -> str:
-        if not context:
-            return "No relevant information found in knowledge base."
+    def _create_agent(self) -> None:
+        """Create deepagents agent with proper middleware configuration."""
         
-        domain = metadata.get('domain', 'general')
-        domain_context = f"Knowledge Domain: {domain}" if domain != 'general' else ""
+        print("🔧 [SETUP] Initializing RAG Master Agent with custom middleware.")
         
-        prompt = PromptLoader.format_prompt(
-            'rag', 'domain_aware_rag',
-            system_prompt="Answer the user question based on provided context.",
-            domain_context=domain_context,
-            context=context,
-            refined_query=query
+        # Import langchain tools for subagents
+        from ..tools.ingestion_tools import (
+            chunk_document_tool,
+            extract_metadata_tool, 
+            save_to_vectordb_tool,
+            ingest_sqlite_table_tool
         )
         
-        return self.llm_service.generate_response(prompt)
+        # Define subagents. The SubAgentMiddleware will turn these into tools for the master agent.
+        subagents = [
+            {
+                "name": "ingestion_specialist",
+                "description": "Use this specialist for any and all tasks related to ingesting, processing, and storing documents from a file path.",
+                "system_prompt": "You are a document ingestion specialist. Your job is to use the available tools to process and store documents.",
+                "tools": [chunk_document_tool, extract_metadata_tool, save_to_vectordb_tool, ingest_sqlite_table_tool],
+                "model": self.llm_service.llm,
+            },
+            {
+                "name": "retrieval_specialist", 
+                "description": "Use this specialist for any and all tasks related to searching, querying, and retrieving information from stored documents.",
+                "system_prompt": "You are a document retrieval specialist. Your job is to find and synthesize answers from the vector database.",
+                "tools": [], # This subagent will use its internal services for retrieval
+                "model": self.llm_service.llm,
+            }
+        ]
+        
+        print("📋 [SETUP] Using deepagents auto-middleware with subagents parameter.")
+        
+        # Let deepagents handle all middleware automatically by passing the subagents list.
+        # The master agent will have NO tools of its own; its tools ARE the subagents.
+        self.agent = create_deep_agent(
+            model=self.llm_service.llm,
+            system_prompt=self._get_system_prompt(),
+            middleware=[RAGToolMiddleware()]
+        )
+        
+        print("✅ [SETUP] RAG Master Agent initialized with custom middleware.")
     
-    def _extract_tags(self, query: str, answer: str) -> list:
-        try:
-            prompt = PromptLoader.format_prompt(
-                'semantic_analysis', 'extract_tags',
-                query=query,
-                answer=answer[:500]
-            )
-            response = self.llm_service.generate_response(prompt)
-            tags = json.loads(response)
-            return tags if isinstance(tags, list) else ["general"]
-        except:
-            return ["general"]
+    def _get_system_prompt(self) -> str:
+        """A simple, direct system prompt that instructs the agent to use its subagent tools."""
+        return """You are a master orchestrator. Your ONLY job is to delegate tasks to one of your specialized subagents. You MUST follow these rules.
+
+AVAILABLE SUBAGENT TOOLS:
+- `ingestion_specialist`: Call this subagent for ANY request related to adding, processing, storing, or ingesting documents. The entire user request should be passed as input.
+- `retrieval_specialist`: Call this subagent for ANY request related to searching, finding, querying, or retrieving information. The entire user request should be passed as input.
+
+DELEGATION RULES (MANDATORY):
+1.  If the user's request contains keywords like "ingest", "process document", "add file", "store data", or a file path, you MUST delegate the entire request to the `ingestion_specialist`.
+2.  If the user's request contains keywords like "search", "find", "query", "what is", or asks a question, you MUST delegate the entire request to the `retrieval_specialist`.
+3.  You do not have the ability to answer questions or process files directly. You MUST delegate to a subagent.
+
+Example 1:
+User Request: "Please ingest the document at test_documents/report.txt"
+Your Action: Call the `ingestion_specialist` tool with the input "Please ingest the document at test_documents/report.txt".
+
+Example 2:
+User Request: "What happened during the network outage?"
+Your Action: Call the `retrieval_specialist` tool with the input "What happened during the network outage?".
+"""
     
-    def _optimize_answer(self, answer: str, query: str) -> dict:
-        try:
-            from .healing_agent import HealingAgent
-            healing = HealingAgent(self.services, self.agent_config.get('healing_agent', {}))
-            return healing.optimize_answer(answer, query, token_limit=250)
-        except:
-            return {"success": False}
+    # ========================================================================
+    # PUBLIC API 
+    # ========================================================================
     
-    def _record_operation(self, query: str, answer: str, tags: list, metadata: dict):
+    def process_request(self, request: str) -> str:
+        """Main entry point with TodoList tracking and verbose logging."""
+        start_time = time.time()
+        
+        print(f"\n🎯 [MASTER] Processing request: {request[:100]}...")
+        print(f"⏱️  [MASTER] Started at: {datetime.now().strftime('%H:%M:%S')}")
+        
         try:
-            # [CHANGE LOG] Using centralized get_connection() utility
-            conn = get_connection()
-            cursor = conn.cursor()
-            cursor.execute("""
-                INSERT INTO agent_memory (agent_name, memory_key, memory_value, memory_type)
-                VALUES (?, ?, ?, ?)
-            """, (
-                self.name,
-                f"question_{query[:30]}",
-                json.dumps({'query': query, 'tags': tags, 'metadata': metadata}),
-                'user_question'
-            ))
-            conn.commit()
-            conn.close()
-        except:
-            pass
+            # Enhanced request with explicit TodoList instructions
+            enhanced_request = request # No more complex prompt wrapping
+            
+            # Invoke with middleware handling all the routing and logging
+            response = self.agent.invoke({"input": request})
+            
+            # Update metrics  
+            self.metrics["operations"] += 1
+            elapsed_ms = int((time.time() - start_time) * 1000)
+            
+            print(f"⏱️  [MASTER] Completed in: {elapsed_ms}ms")
+            print(f"📊 [MASTER] Total operations: {self.metrics['operations']}")
+            
+            # Extract response content
+            content = getattr(response, 'content', str(response))
+            result = content.strip()
+            
+            print(f"✅ [MASTER] Request completed successfully")
+            return result
+            
+        except Exception as e:
+            self.metrics["errors"] += 1
+            error_msg = f"Request failed: {str(e)}"
+            print(f"❌ [MASTER] {error_msg}")
+            return error_msg
+    
+    def ingest_document(self, document_path: str) -> str:
+        """Simple document ingestion."""
+        request = f"Please ingest the document at: {document_path}"
+        result = self.process_request(request)
+        self.metrics["ingestion"] += 1
+        return result
+    
+    def ask_question(self, question: str) -> str:
+        """Simple question answering."""
+        request = f"Please search for information to answer: {question}"
+        result = self.process_request(request)
+        self.metrics["retrieval"] += 1
+        return result
+    
+    def get_metrics(self) -> Dict[str, Any]:
+        """Get operational metrics."""
+        return self.metrics.copy()
+    
+    def reset_metrics(self) -> None:
+        """Reset metrics."""
+        self.metrics = {"operations": 0, "ingestion": 0, "retrieval": 0, "errors": 0}
+    
+    def receive_subagent_result(self, subagent_name: str, result: Dict[str, Any]) -> None:
+        """Receive and process results from subagents."""
+        if self.verbose:
+            success = result.get('success', False)
+            status = "✅" if success else "❌"
+            print(f"{status} [SUBAGENT] {subagent_name} completed: {result.get('error', 'Success')}")
+    
+    def debug_workflow(self, request: str) -> str:
+        """Debug version that shows internal deepagents workflow."""
+        print(f"\n🔍 [DEBUG] Starting deepagents workflow visualization...")
+        print(f"📝 [DEBUG] Request: {request[:80]}...")
+        
+        try:
+            # Step 1: Show initial TodoList state
+            print(f"\n📋 [DEBUG] Checking initial TodoList...")
+            todo_response = self.agent.invoke({"input": "Use read_todos to show current status"})
+            todo_content = getattr(todo_response, 'content', str(todo_response))
+            print(f"📋 [INITIAL TODOS] {todo_content[:200]}...")
+            
+            # Step 2: Process the main request with verbose logging
+            print(f"\n🎯 [DEBUG] Processing main request with full tracking...")
+            enhanced_request = f"""PROCESS WITH MAXIMUM VISIBILITY:
+            
+Request: {request}
+
+WORKFLOW REQUIREMENTS:
+1. Use write_todos to add: 'Starting request: {request[:30]}...'
+2. Analyze what type of request this is
+3. Use write_todos to add: 'Request type identified: [type]'
+4. Choose and delegate to appropriate subagent
+5. Use write_todos to add: 'Delegating to [subagent] subagent'
+6. Monitor subagent progress
+7. Use write_todos to add: 'Subagent completed with result'
+8. Use read_todos to show final status
+9. Provide detailed summary
+
+BE EXTREMELY VERBOSE about EVERY step and TodoList interaction."""
+            
+            response = self.agent.invoke({"input": enhanced_request})
+            
+            # Step 3: Show final TodoList state
+            print(f"\n📋 [DEBUG] Checking final TodoList state...")
+            final_todo_response = self.agent.invoke({"input": "Use read_todos to show all completed and pending tasks"})
+            final_todo_content = getattr(final_todo_response, 'content', str(final_todo_response))
+            print(f"📋 [FINAL TODOS] {final_todo_content[:300]}...")
+            
+            # Extract and return main response
+            content = getattr(response, 'content', str(response))
+            print(f"\n✅ [DEBUG] Workflow visualization complete")
+            return content
+            
+        except Exception as e:
+            error_msg = f"Debug workflow failed: {str(e)}"
+            print(f"❌ [DEBUG] {error_msg}")
+            return error_msg
+

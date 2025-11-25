@@ -6,7 +6,7 @@ import sqlite3
 from pathlib import Path
 from typing import Optional
 
-from incident_iq.config import get_database_dir, get_database_name
+from ...config import get_database_dir, get_database_name
 
 
 def _get_default_db_path() -> Path:

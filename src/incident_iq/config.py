@@ -28,12 +28,12 @@ class Config:
                 with open(config_file, 'rb') as f:
                     full_config = tomllib.load(f)
                 self._config = full_config.get('tool', {}).get('incident-iq', {})
-                print(f"✓ Configuration loaded from {config_file}")
+                print(f"Configuration loaded from {config_file}")
             else:
-                print("⚠ pyproject.toml not found, using defaults")
+                print("Warning: pyproject.toml not found, using defaults")
                 self._config = {}
         except Exception as e:
-            print(f"⚠ Failed to load configuration: {e}")
+            print(f"Warning: Failed to load configuration: {e}")
             self._config = {}
     
     @staticmethod

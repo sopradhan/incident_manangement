@@ -24,5 +24,13 @@ class LLMService:
     def generate(self, prompt: str) -> str:
         return self.llm.generate(prompt)
 
+    def generate_response(self, prompt: str) -> str:
+        """Alias for generate() method for compatibility"""
+        return self.generate(prompt)
+
     def embed(self, text: str) -> List[float]:
         return self.embedder.embed(text)
+    
+    def generate_embedding(self, text: str) -> List[float]:
+        """Alias for embed() method for compatibility"""
+        return self.embed(text)
