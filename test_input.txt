@@ -1,0 +1,5 @@
+What is incident management?
+no
+What are incident priority levels?
+yes
+quit

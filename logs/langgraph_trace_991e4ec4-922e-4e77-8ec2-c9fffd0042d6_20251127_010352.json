@@ -1,0 +1,192 @@
+{
+  "session_id": "991e4ec4-922e-4e77-8ec2-c9fffd0042d6",
+  "start_time": "2025-11-27T01:03:44.611645",
+  "total_duration_ms": 7914.741039276123,
+  "nodes_executed": [
+    {
+      "timestamp": 1764185624.6116471,
+      "node_name": "retrieve_and_answer_workflow",
+      "state_snapshot": {
+        "question": "do you have travle domain data",
+        "doc_id": null,
+        "session_id": "991e4ec4-922e-4e77-8ec2-c9fffd0042d6",
+        "response_mode": "concise",
+        "performance_history": [],
+        "errors": [],
+        "status": "started"
+      },
+      "status": "completed",
+      "end_timestamp": 1764185632.525972,
+      "duration_ms": 7914.301156997681,
+      "state_after": {
+        "question": "do you have travle domain data",
+        "doc_id": null,
+        "session_id": "991e4ec4-922e-4e77-8ec2-c9fffd0042d6",
+        "response_mode": "concise",
+        "performance_history": [],
+        "errors": [],
+        "status": "completed",
+        "context": {
+          "success": true,
+          "context": [
+            {
+              "text": "INCIDENT MANAGEMENT GUIDE\n            \n            Incident severity levels are classified as follows:\n            - Critical: System down, affecting all users\n            - High: Major functionality unavailable\n            - Medium: Partial functionality affected\n            - Low: Minor issues, workaround available\n            \n            Response times:\n            - Critical: 15 minutes\n            - High: 1 hour\n            - Medium: 4 hours\n            - Low: 1 business day",
+              "score": 0.5633362531661987,
+              "metadata": {
+                "chunk_index": 0,
+                "ingestion_date": "2025-11-26T23:33:40.800111",
+                "rbac_namespace": "general",
+                "doc_id": "incident_guide_001"
+              }
+            },
+            {
+              "text": "Incident Severity Levels and Classification\n    \n    The incident management process uses a standardized severity classification system\n    to prioritize incidents and allocate appropriate resources for resolution.\n    \n    Severity Level 1 - Critical:\n    - Complete service outage affecting all users\n    - Data loss or corruption\n    - Security breach detected\n    - Response time: Immediate (< 15 minutes)\n    - Resolution target: 4 hours\n    \n    Severity Level 2 - High:",
+              "score": 0.5645570755004883,
+              "metadata": {
+                "rbac_namespace": "general",
+                "chunk_index": 0,
+                "ingestion_date": "2025-11-26T22:24:38.890330",
+                "doc_id": "doc_incident_001"
+              }
+            },
+            {
+              "text": "This is a test document about incident management. Incident severity levels are: critical, high, medium, low.",
+              "score": 0.5719871520996094,
+              "metadata": {
+                "chunk_index": 0,
+                "doc_id": "test_doc_001",
+                "rbac_namespace": "general",
+                "ingestion_date": "2025-11-26T23:27:15.429433"
+              }
+            },
+            {
+              "text": "Severity Level 2 - High:\n    - Major service degradation affecting multiple users\n    - Significant performance impact\n    - Important functionality unavailable\n    - Response time: < 1 hour\n    - Resolution target: 24 hours\n    \n    Severity Level 3 - Medium:\n    - Partial service impact, single user or small group affected\n    - Workaround available\n    - Response time: < 4 hours\n    - Resolution target: 3 days\n    \n    Severity Level 4 - Low:",
+              "score": 0.5877381563186646,
+              "metadata": {
+                "ingestion_date": "2025-11-26T22:24:38.890330",
+                "doc_id": "doc_incident_001",
+                "chunk_index": 1,
+                "rbac_namespace": "general"
+              }
+            },
+            {
+              "text": "Incident Management Process\n\nAn incident is any unplanned interruption to a service.\n\n## Classification\n- Critical: Complete outage\n- High: Major impact\n- Medium: Minor impact\n- Low: Cosmetic\n\n## Workflow\n1. Detection\n2. Logging\n3. Investigation\n4. Resolution\n5. Closure",
+              "score": 0.5907266139984131,
+              "metadata": {
+                "ingestion_date": "2025-11-26T20:14:21.752844",
+                "doc_id": "langgraph_doc_001",
+                "rbac_namespace": "general",
+                "chunk_index": 0
+              }
+            }
+          ]
+        },
+        "retrieval_quality": 1.0,
+        "reranked_context": {
+          "success": true,
+          "reranked_context": [
+            {
+              "text": "Incident Management Process\n\nAn incident is any unplanned interruption to a service.\n\n## Classification\n- Critical: Complete outage\n- High: Major impact\n- Medium: Minor impact\n- Low: Cosmetic\n\n## Workflow\n1. Detection\n2. Logging\n3. Investigation\n4. Resolution\n5. Closure",
+              "score": 0.5907266139984131,
+              "metadata": {
+                "ingestion_date": "2025-11-26T20:14:21.752844",
+                "doc_id": "langgraph_doc_001",
+                "rbac_namespace": "general",
+                "chunk_index": 0
+              }
+            },
+            {
+              "text": "Severity Level 2 - High:\n    - Major service degradation affecting multiple users\n    - Significant performance impact\n    - Important functionality unavailable\n    - Response time: < 1 hour\n    - Resolution target: 24 hours\n    \n    Severity Level 3 - Medium:\n    - Partial service impact, single user or small group affected\n    - Workaround available\n    - Response time: < 4 hours\n    - Resolution target: 3 days\n    \n    Severity Level 4 - Low:",
+              "score": 0.5877381563186646,
+              "metadata": {
+                "ingestion_date": "2025-11-26T22:24:38.890330",
+                "doc_id": "doc_incident_001",
+                "chunk_index": 1,
+                "rbac_namespace": "general"
+              }
+            },
+            {
+              "text": "This is a test document about incident management. Incident severity levels are: critical, high, medium, low.",
+              "score": 0.5719871520996094,
+              "metadata": {
+                "chunk_index": 0,
+                "doc_id": "test_doc_001",
+                "rbac_namespace": "general",
+                "ingestion_date": "2025-11-26T23:27:15.429433"
+              }
+            },
+            {
+              "text": "Incident Severity Levels and Classification\n    \n    The incident management process uses a standardized severity classification system\n    to prioritize incidents and allocate appropriate resources for resolution.\n    \n    Severity Level 1 - Critical:\n    - Complete service outage affecting all users\n    - Data loss or corruption\n    - Security breach detected\n    - Response time: Immediate (< 15 minutes)\n    - Resolution target: 4 hours\n    \n    Severity Level 2 - High:",
+              "score": 0.5645570755004883,
+              "metadata": {
+                "rbac_namespace": "general",
+                "chunk_index": 0,
+                "ingestion_date": "2025-11-26T22:24:38.890330",
+                "doc_id": "doc_incident_001"
+              }
+            },
+            {
+              "text": "INCIDENT MANAGEMENT GUIDE\n            \n            Incident severity levels are classified as follows:\n            - Critical: System down, affecting all users\n            - High: Major functionality unavailable\n            - Medium: Partial functionality affected\n            - Low: Minor issues, workaround available\n            \n            Response times:\n            - Critical: 15 minutes\n            - High: 1 hour\n            - Medium: 4 hours\n            - Low: 1 business day",
+              "score": 0.5633362531661987,
+              "metadata": {
+                "chunk_index": 0,
+                "ingestion_date": "2025-11-26T23:33:40.800111",
+                "rbac_namespace": "general",
+                "doc_id": "incident_guide_001"
+              }
+            }
+          ]
+        },
+        "should_optimize": false,
+        "optimization_reason": "Quality=1.00, Results=5",
+        "answer": "{\"success\": true, \"answer\": \"No, I don't have any information about a \\\"travel domain.\\\" The context provided does not mention any travel-related data or services. If you're looking for travel domain data, it's likely that the source is referring to a specific travel website or service, but without more details, I can't provide accurate information.\"}",
+        "query_logged_id": 34,
+        "traceability": {
+          "success": true,
+          "traceability": {
+            "question": "do you have travle domain data",
+            "sources_used": 5,
+            "documents": [
+              {
+                "doc_id": "langgraph_doc_001",
+                "chunk_index": 0,
+                "similarity_score": 0.5907266139984131,
+                "text_preview": "Incident Management Process\n\nAn incident is any unplanned interruption to a service.\n\n## Classificat..."
+              },
+              {
+                "doc_id": "doc_incident_001",
+                "chunk_index": 1,
+                "similarity_score": 0.5877381563186646,
+                "text_preview": "Severity Level 2 - High:\n    - Major service degradation affecting multiple users\n    - Significant ..."
+              },
+              {
+                "doc_id": "test_doc_001",
+                "chunk_index": 0,
+                "similarity_score": 0.5719871520996094,
+                "text_preview": "This is a test document about incident management. Incident severity levels are: critical, high, med..."
+              },
+              {
+                "doc_id": "doc_incident_001",
+                "chunk_index": 0,
+                "similarity_score": 0.5645570755004883,
+                "text_preview": "Incident Severity Levels and Classification\n    \n    The incident management process uses a standard..."
+              },
+              {
+                "doc_id": "incident_guide_001",
+                "chunk_index": 0,
+                "similarity_score": 0.5633362531661987,
+                "text_preview": "INCIDENT MANAGEMENT GUIDE\n            \n            Incident severity levels are classified as follow..."
+              }
+            ]
+          }
+        },
+        "execution_time_ms": 7914.31736946106
+      }
+    }
+  ],
+  "node_count": 1,
+  "successful_nodes": 1,
+  "failed_nodes": 0,
+  "errors": [],
+  "error_count": 0
+}

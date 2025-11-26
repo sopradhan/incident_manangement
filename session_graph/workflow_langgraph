@@ -1,0 +1,36 @@
+// LangGraph RAG Workflow
+digraph {
+	graph [bgcolor=white margin=0.5 nodesep=0.5 pad=0.5 rankdir=TB ranksep=0.7]
+	node [fillcolor=lightblue fontname=Arial fontsize=12 margin="0.4,0.3" penwidth=2 shape=box style="rounded,filled"]
+	edge [arrowsize=2 color="#333333" fontname=Arial fontsize=10 penwidth=2.5]
+	start [label=START fillcolor=lightgreen]
+	retrieve [label="Retrieve Context
+(Vector Search)" fillcolor=lightblue]
+	rerank [label="Rerank Context
+(Score & Sort)" fillcolor=lightcyan]
+	check_opt [label="Check Optimization
+(RL Agent Decision)" fillcolor=lightyellow]
+	optimize [label="Optimize Context
+(Healing Tools)
+Re-embed | Reindex" fillcolor=lavender]
+	answer [label="Generate Answer
+(LLM Response)" fillcolor=lightgreen]
+	trace [label="Traceability
+(Record Sources)" fillcolor=lightcyan]
+	end [label=END fillcolor=lightcoral]
+	start -> retrieve [label="User
+Query"]
+	retrieve -> rerank [label="Retrieved
+Documents"]
+	rerank -> check_opt [label="Ranked
+Context"]
+	check_opt -> optimize [label="Quality
+Low"]
+	check_opt -> answer [label="Quality
+Good"]
+	optimize -> answer [label="Optimized
+Context"]
+	answer -> trace [label="Response
+Generated"]
+	trace -> end [label=Complete]
+}

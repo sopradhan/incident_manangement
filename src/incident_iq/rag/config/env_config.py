@@ -9,11 +9,12 @@ class EnvConfig:
     
     @staticmethod
     def get_db_path() -> str:
-        return os.getenv('DB_PATH', 'src/incident_iq/database/data/incident_iq.db')
+        # FIXED: Use optimized RAG schema in chroma_db/rag.db, not old incident_iq.db
+        return os.getenv('DB_PATH', 'chroma_db/rag.db')
     
     @staticmethod
     def get_chroma_db_path() -> str:
-        return os.getenv('CHROMA_DB_PATH', 'src/incident_iq/database/data/chroma_db')
+        return os.getenv('CHROMA_DB_PATH', 'chroma_db')
     
     @staticmethod
     def get_rag_config_path() -> str:

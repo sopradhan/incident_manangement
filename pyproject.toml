@@ -17,10 +17,10 @@ where = ["src"]
 
 [tool.incident-iq]
 # Database configuration
-database-dir = "data"
-database-name = "incident_iq.db"
+database-dir = "chroma_db"
+database-name = "rag.db"
 
 # Vector DB configuration
-vector-db-dir = "data/chroma_db"
+vector-db-dir = "chroma_db"
 
 # Paths are relative to the package root (src/incident_iq)

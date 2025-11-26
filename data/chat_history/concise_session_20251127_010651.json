@@ -1,0 +1,22 @@
+{
+  "question": "What are incident priority levels?",
+  "answer": "END_SESSION",
+  "session_id": "388c7d41-bdec-4843-8410-18a2d13f28b7",
+  "satisfied": true,
+  "message_count": 2,
+  "conversation_history": [
+    {
+      "timestamp": "2025-11-27T01:06:44.308054",
+      "question": "What is incident management?",
+      "answer": "Incident management is the process of identifying, reporting, triaging, assigning support teams to resolve incidents, implementing fixes or workarounds, testing and verifying them, documenting their actions, conducting a post-incentive review, and updating the incident severity levels.",
+      "session_id": "d397421f-796f-419c-ad78-2090ac6217b6"
+    },
+    {
+      "timestamp": "2025-11-27T01:06:51.446965",
+      "question": "What are incident priority levels?",
+      "answer": "Incident priority levels are classified as follows:\n- Critical: System down, affecting all users\n- High: Major functionality unavailable\n- Medium: Partial functionality affected\n- Low: Minor issues, workaround available.",
+      "session_id": "388c7d41-bdec-4843-8410-18a2d13f28b7"
+    }
+  ],
+  "errors": []
+}

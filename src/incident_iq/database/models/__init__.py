@@ -26,6 +26,14 @@ from .department_user import DepartmentUserModel
 from .user_role import UserRoleModel
 from .rl_model import RLQTableModel, RLEpisodeModel, RLExperienceBufferModel, RLOptimizationModel, RLPolicyMetricsModel, RLActionStatsModel
 
+# New optimized schema models
+try:
+    from .chunk_embedding_data_model import ChunkEmbeddingDataModel
+    from .rag_history_model import RAGHistoryModel
+except ImportError:
+    # Models may not exist yet
+    pass
+
 __all__ = [
     "BaseModel",
     "DocumentModel",
@@ -57,4 +65,6 @@ __all__ = [
     "RLOptimizationModel",
     "RLPolicyMetricsModel",
     "RLActionStatsModel",
+    "ChunkEmbeddingDataModel",
+    "RAGHistoryModel",
 ]
