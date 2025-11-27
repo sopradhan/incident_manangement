@@ -1,0 +1,9 @@
+// LangGraph Execution
+digraph {
+	graph [bgcolor=white rankdir=LR splines=ortho]
+	node [fillcolor=lightblue fontname=Courier fontsize=10 shape=box style="rounded,filled"]
+	edge [color=gray fontname=Courier fontsize=9]
+	node_0 [label="retrieve_and_answer_workflow
+6796ms
+[completed]" fillcolor=lightgreen shape=box style="rounded,filled"]
+}

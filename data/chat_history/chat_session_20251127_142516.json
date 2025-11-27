@@ -1,0 +1,19 @@
+{
+  "timestamp": "2025-11-27T14:25:16.177358",
+  "response_mode": "concise",
+  "message_count": 2,
+  "conversation_history": [
+    {
+      "timestamp": "2025-11-27T14:23:59.277336",
+      "question": "whats my name",
+      "answer": "I'm Qwen, an artificial intelligence created by Alibaba Cloud. I don't have a name like humans do. However, if you'd like, I can help answer questions about myself or any other topic that you'd like me to assist with!",
+      "response_mode": "concise"
+    },
+    {
+      "timestamp": "2025-11-27T14:25:02.321029",
+      "question": "what is incident severity ?",
+      "answer": "Incident severity levels are classified as follows:\n- Critical: System down, affecting all users\n- High: Major functionality unavailable\n- Medium: Partial functionality affected\n- Low: Minor issues, workaround available.",
+      "response_mode": "concise"
+    }
+  ]
+}

@@ -1,4 +1,6 @@
-"""RAG Agent System - Autonomous Agentic RAG with DeepAgents"""
-from .agent.autonomous_rag_agent import AutonomousRAGAgent
+"""RAG Agent System - DeepAgents and LangGraph orchestration"""
 
-__all__ = ['AutonomousRAGAgent']
+# Note: ConfigService does not exist - it was an optional dependency
+# The RAG system is fully functional without it
+
+__all__ = []

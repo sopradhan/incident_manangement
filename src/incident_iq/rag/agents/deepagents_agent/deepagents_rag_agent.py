@@ -51,7 +51,7 @@ from ...tools.healing_tools import (
 from ...tools.adjust_config_tool import adjust_config_tool
 from ...tools.services.llm_service import LLMService
 from ...tools.services.vectordb_service import VectorDBService
-from ...agent.autonomous_rag_agent import ConfigService
+from ...config.env_config import EnvConfig
 
 
 # ============================================================================
@@ -298,9 +298,10 @@ class DeepAgentsRAGAgent:
         self.master_agent = self._create_master_agent()
 
     def _init_services(self):
-        """Initialize services."""
-        config_dir = os.path.join(os.path.dirname(__file__), "..", "..", "config")
-        llm_config_path = os.getenv("LLM_CONFIG_PATH", os.path.join(config_dir, "llm_config.json"))
+        """Initialize services using environment configuration."""
+        # Get configuration paths from EnvConfig
+        rag_config_path = EnvConfig.get_rag_config_path()
+        llm_config_path = os.getenv("LLM_CONFIG_PATH", os.path.join(rag_config_path, "llm_config.json"))
         
         try:
             with open(llm_config_path, "r") as f:
@@ -309,13 +310,16 @@ class DeepAgentsRAGAgent:
             llm_config = {"default_provider": "ollama", "llm_providers": {}, "embedding_providers": {}}
         
         llm_service = LLMService(llm_config)
+        
+        # Use EnvConfig for VectorDB paths
+        chroma_db_path = EnvConfig.get_chroma_db_path()
         vectordb_service = VectorDBService(
-            persist_directory=os.getenv("CHROMA_DB_PATH", "./chroma_db"),
+            persist_directory=chroma_db_path,
             collection_name=os.getenv("CHROMA_COLLECTION", "rag_embeddings")
         )
-        config_service = ConfigService()
         
-        return llm_service, vectordb_service, config_service
+        # config_service is not used; use EnvConfig directly
+        return llm_service, vectordb_service, None
 
     def _create_ingestion_subagent(self) -> Dict[str, Any]:
         """Create ingestion subagent with tools."""
@@ -476,7 +480,20 @@ RETURN: Analysis + Issues + Recommendations + Improvements + Status""",
         @tool
         def adjust_system_config(updates: Dict[str, Any]) -> str:
             """Adjust system configuration."""
-            return adjust_config_tool(self.config_service, updates)
+            # Create a simple config wrapper using EnvConfig
+            class ConfigWrapper:
+                def get_config(self):
+                    return {
+                        "RAG_K_FINAL": int(os.getenv("RAG_K_FINAL", "5")),
+                        "CHUNK_SIZE": int(os.getenv("CHUNK_SIZE", "500")),
+                        "CHUNK_OVERLAP": int(os.getenv("CHUNK_OVERLAP", "50")),
+                    }
+                def update_config(self, updates):
+                    for key, value in updates.items():
+                        os.environ[key] = str(value)
+            
+            config_wrapper = ConfigWrapper()
+            return adjust_config_tool(config_wrapper, updates)
 
         tools = [adjust_system_config]
         

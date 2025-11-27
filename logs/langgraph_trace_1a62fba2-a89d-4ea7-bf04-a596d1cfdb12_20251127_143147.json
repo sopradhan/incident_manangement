@@ -1,0 +1,32 @@
+{
+  "session_id": "1a62fba2-a89d-4ea7-bf04-a596d1cfdb12",
+  "start_time": "2025-11-27T14:31:47.236764",
+  "total_duration_ms": 0.6802082061767578,
+  "nodes_executed": [
+    {
+      "timestamp": 1764234107.2367659,
+      "node_name": "retrieve_and_answer_workflow",
+      "state_snapshot": {
+        "question": "What is the status of incident 2?",
+        "doc_id": null,
+        "session_id": "1a62fba2-a89d-4ea7-bf04-a596d1cfdb12",
+        "response_mode": "verbose",
+        "performance_history": [],
+        "errors": [],
+        "status": "started"
+      },
+      "status": "started"
+    }
+  ],
+  "node_count": 1,
+  "successful_nodes": 0,
+  "failed_nodes": 0,
+  "errors": [
+    {
+      "timestamp": 1764234107.2373154,
+      "node_name": "retrieve_and_answer_workflow",
+      "error_message": "'charmap' codec can't encode character '\\u2717' in position 2: character maps to <undefined>"
+    }
+  ],
+  "error_count": 1
+}

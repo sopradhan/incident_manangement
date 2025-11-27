@@ -1,11 +1,25 @@
 {
   "data_sources": {
     "pdf": {
-      "enabled": false,
+      "enabled": true,
       "supported_extensions": [".pdf"],
       "chunk_size": 1000,
       "chunk_overlap": 200,
       "loader_type": "pypdf"
+    },
+    "text": {
+      "enabled": true,
+      "supported_extensions": [".txt", ".md", ".markdown"],
+      "chunk_size": 512,
+      "chunk_overlap": 50,
+      "loader_type": "text"
+    },
+    "word": {
+      "enabled": true,
+      "supported_extensions": [".docx", ".doc"],
+      "chunk_size": 800,
+      "chunk_overlap": 100,
+      "loader_type": "python-docx"
     },
     "excel": {
       "enabled": false,
@@ -48,6 +62,32 @@
         "skip_empty_records": true
       }
     },
+    "document_paths": {
+      "enabled": true,
+      "description": "Ingest documents from file system paths",
+      "default_directories": [
+        "./docs",
+        "./knowledgebase",
+        "./manuals"
+      ],
+      "recursive": true,
+      "follow_symlinks": false,
+      "chunk_strategies": {
+        "pdf": {
+          "chunk_size": 1000,
+          "chunk_overlap": 200,
+          "extract_tables": true
+        },
+        "text": {
+          "chunk_size": 512,
+          "chunk_overlap": 50
+        },
+        "word": {
+          "chunk_size": 800,
+          "chunk_overlap": 100
+        }
+      }
+    },
     "json": {
       "enabled": true,
       "supported_extensions": [".json"],
@@ -57,6 +97,23 @@
       "enabled": true,
       "user_agent": "DeepAgent-RAG/1.0",
       "timeout": 30
+    },
+    "guardrails": {
+      "enabled": true,
+      "response_mode_policies": {
+        "concise": {
+          "validators": ["hallucination_check", "security_incident_policy"],
+          "description": "Ensure the solution is accurate, safe, and policy-compliant (user-friendly mode)."
+        },
+        "internal": {
+          "validators": ["hallucination_check"],
+          "description": "Only check for hallucinations in system integration mode."
+        },
+        "verbose": {
+          "validators": [],
+          "description": "No guardrails in verbose mode - show all metadata."
+        }
+      }
     }
   },
   "vector_store": {
